@@ -1,0 +1,96 @@
+# ==============================================================================
+# ServicePulse - Production Docker Compose Specification
+# Project: ServicePulse (AT-Servis BMI)
+# Author: Muhammadyusuf Usmonov
+# Target Domain: https://servicepulse.uz
+# ==============================================================================
+name: servicepulse-prod
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: servicepulse-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-servicepulse.uz}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - servicepulse-prod-net
+
+  db:
+    image: postgres:16-alpine
+    container_name: servicepulse-prod-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-servicepulse}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
+    volumes:
+      - pgdata_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-servicepulse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - servicepulse-prod-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: servicepulse-prod-backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-servicepulse}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:?Production SECRET_KEY required}
+      BACKEND_CORS_ORIGINS: "https://${DOMAIN_NAME:-servicepulse.uz}"
+      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?Enrollment secret required}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic -c backend/alembic.ini upgrade head &&
+             python -m backend.app.db.init_db &&
+             uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - servicepulse-prod-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: servicepulse-prod-frontend
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - servicepulse-prod-net
+
+volumes:
+  pgdata_prod:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+
+networks:
+  servicepulse-prod-net:
+    driver: bridge

@@ -1,0 +1,39 @@
+# ==============================================================================
+# ServicePulse - Caddyfile Reverse Proxy & Automated HTTPS
+# Author: Muhammadyusuf Usmonov
+# ==============================================================================
+{$DOMAIN_NAME:servicepulse.uz} {
+    encode gzip zstd
+
+    # API and OpenAPI Docs
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+    handle /docs* {
+        reverse_proxy backend:8000
+    }
+    handle /redoc* {
+        reverse_proxy backend:8000
+    }
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend Single Page Application
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    log {
+        output file /var/log/caddy/access.log
+    }
+}

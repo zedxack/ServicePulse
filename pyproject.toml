@@ -1,0 +1,27 @@
+[project]
+name = "servicepulse"
+version = "1.0.0"
+description = "ServicePulse Enterprise RMM & ITSM Platform"
+authors = [{ name = "Muhammadyusuf Usmonov", email = "m.usmonov@servicepulse.uz" }]
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = [
+    ".git",
+    ".venv",
+    "backend/migrations/versions",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E501", # Line length handled by formatter
+    "B008", # FastAPI Depends in function arguments
+]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
