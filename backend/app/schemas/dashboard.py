@@ -103,13 +103,30 @@ class SysAdminDashboardResponse(BaseModel):
 class CEODashboardResponse(BaseModel):
     timestamp: datetime
     organization_id: Optional[int] = None
+
+    # Contractual SLA Target (Configured agreement target, kept separate from probe checks)
     sla_target_percent: float = 99.5
-    sla_achievement_percent: Optional[float] = None
+
+    # Actual Contractual SLA (Explicitly unavailable until duration-based downtime engine is implemented)
+    contractual_sla_uptime_percent: Optional[float] = None
+    contractual_sla_status: str = "unavailable"
+    contractual_sla_achievement_percent: Optional[float] = None
+
+    # Empirical Probe Success Ratio (Discrete network check probe frequency)
+    probe_success_ratio_percent: Optional[float] = None
+    probe_success_status: str = "insufficient_data"
+
+    # Real-Time Device Snapshot Availability
     current_device_snapshot_percent: float
     infrastructure_availability_percent: float
+
+    # Legacy / compatibility fields (explicitly None/unavailable to prevent misleading SLA claims)
     measured_historical_sla_uptime_percent: Optional[float] = None
-    sla_uptime_status: str = "insufficient_data"
+    sla_uptime_status: str = "unavailable"
+    sla_achievement_percent: Optional[float] = None
     actual_availability_percent: Optional[float] = None
+
+    # Incident Response Performance (MTTD / MTTR)
     mttd_minutes: Optional[float] = None
     mttr_minutes: Optional[float] = None
     mttd_status: str

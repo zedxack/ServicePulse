@@ -790,10 +790,15 @@ async def test_kpi_and_sla_correctness_and_edge_cases(client: AsyncClient):
     assert "infrastructure_availability_percent" in data
     assert data["current_device_snapshot_percent"] > 0
 
-    # Demo org has seeded historical probes -> operational
-    assert data["sla_uptime_status"] == "operational"
-    assert data["measured_historical_sla_uptime_percent"] is not None
-    assert data["measured_historical_sla_uptime_percent"] > 0
+    # Contractual SLA is returned as unavailable until duration-based historical uptime is implemented
+    assert data["contractual_sla_status"] == "unavailable"
+    assert data["contractual_sla_uptime_percent"] is None
+    assert data["sla_achievement_percent"] is None
+
+    # Probe success ratio is kept strictly separate from SLA
+    assert data["probe_success_status"] == "operational"
+    assert data["probe_success_ratio_percent"] is not None
+    assert data["probe_success_ratio_percent"] > 0
 
     # With initial seeded state (no resolved incidents with preceding failed probes):
     assert data["mttd_status"] in ["insufficient_data", "operational"]
@@ -826,6 +831,8 @@ async def test_kpi_and_sla_correctness_and_edge_cases(client: AsyncClient):
 
     empty_ceo = (await client.get("/api/v1/dashboard/ceo", headers=empty_h)).json()
     assert empty_ceo["sla_target_percent"] == 99.5
-    assert empty_ceo["sla_uptime_status"] == "insufficient_data"
-    assert empty_ceo["measured_historical_sla_uptime_percent"] is None
+    assert empty_ceo["contractual_sla_status"] == "unavailable"
+    assert empty_ceo["contractual_sla_uptime_percent"] is None
+    assert empty_ceo["probe_success_status"] == "insufficient_data"
+    assert empty_ceo["probe_success_ratio_percent"] is None
     assert empty_ceo["sla_achievement_percent"] is None

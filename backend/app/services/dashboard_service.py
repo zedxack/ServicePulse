@@ -279,8 +279,8 @@ class DashboardService:
 
         target_sla = settings.SLA_TARGET_PERCENT
 
-        # 2. Measured Historical SLA Uptime (Derived from real network check probe observation history)
-        # Never report current online-device ratio as measured historical SLA
+        # 2. Empirical Probe Success Ratio (Discrete network check probe frequency)
+        # Explicitly distinguished from contractual SLA uptime (no duration/interval integration yet)
         nc_q = select(NetworkCheck.is_successful).join(Device, NetworkCheck.device_id == Device.id)
         if scoped_org_id is not None:
             nc_q = nc_q.where(Device.organization_id == scoped_org_id)
@@ -289,13 +289,16 @@ class DashboardService:
         MIN_OBSERVATIONS_THRESHOLD = 5
         if len(nc_results) >= MIN_OBSERVATIONS_THRESHOLD:
             success_count = sum(1 for s in nc_results if s)
-            historical_sla_uptime = round((success_count / len(nc_results)) * 100.0, 2)
-            sla_uptime_status = "operational"
-            sla_achievement = min(round((historical_sla_uptime / target_sla) * 100.0, 2), 100.0)
+            probe_success_ratio = round((success_count / len(nc_results)) * 100.0, 2)
+            probe_success_status = "operational"
         else:
-            historical_sla_uptime = None
-            sla_uptime_status = "insufficient_data"
-            sla_achievement = None
+            probe_success_ratio = None
+            probe_success_status = "insufficient_data"
+
+        # Contractual SLA is strictly unavailable until duration-based historical calculation is implemented
+        contractual_sla_uptime = None
+        contractual_sla_status = "unavailable"
+        contractual_sla_achievement = None
 
         # 3. MTTD & MTTR (Honest calculations from operational history; no hardcoded defaults)
         resolved_q = select(Incident).where(
@@ -424,12 +427,17 @@ class DashboardService:
             timestamp=now,
             organization_id=scoped_org_id,
             sla_target_percent=target_sla,
-            sla_achievement_percent=sla_achievement,
+            contractual_sla_uptime_percent=contractual_sla_uptime,
+            contractual_sla_status=contractual_sla_status,
+            contractual_sla_achievement_percent=contractual_sla_achievement,
+            probe_success_ratio_percent=probe_success_ratio,
+            probe_success_status=probe_success_status,
             current_device_snapshot_percent=snapshot_availability,
             infrastructure_availability_percent=snapshot_availability,
-            measured_historical_sla_uptime_percent=historical_sla_uptime,
-            sla_uptime_status=sla_uptime_status,
-            actual_availability_percent=historical_sla_uptime,
+            measured_historical_sla_uptime_percent=None,
+            sla_uptime_status="unavailable",
+            sla_achievement_percent=None,
+            actual_availability_percent=snapshot_availability,
             mttd_minutes=mttd_minutes,
             mttr_minutes=mttr_minutes,
             mttd_status=mttd_status,

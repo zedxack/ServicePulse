@@ -37,7 +37,10 @@ async def test_ceo_dashboard_and_insufficient_data_handling(client: AsyncClient,
     assert resp.status_code == 200
     data = resp.json()
     assert data["infrastructure_availability_percent"] > 0
-    assert data["sla_achievement_percent"] > 0
+    assert data["contractual_sla_status"] == "unavailable"
+    assert data["contractual_sla_uptime_percent"] is None
+    assert data["probe_success_status"] == "operational"
+    assert data["probe_success_ratio_percent"] is not None and data["probe_success_ratio_percent"] > 0
     assert "incident_trends" in data
     assert len(data["incident_trends"]) == 7
     assert "top_risk_devices" in data
