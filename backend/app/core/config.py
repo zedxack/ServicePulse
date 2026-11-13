@@ -85,11 +85,23 @@ class Settings(BaseSettings):
     CONSECUTIVE_FAILURE_THRESHOLD: int = 3
     PING_TIMEOUT_SECONDS: int = 2
     TCP_TIMEOUT_SECONDS: int = 3
+    MONITORING_CONCURRENCY_LIMIT: int = 10
+    ICMP_ENABLED: bool = True
+    DEFAULT_MONITORED_TCP_PORTS: List[int] = [80, 443, 554, 8291]
+    WORKER_SIMULATION_MODE: bool = False
+    AUTO_RESOLVE_INCIDENT_ON_RECOVERY: bool = True
 
     # Automated Remediation
     ENABLE_AUTOMATED_REMEDIATION: bool = True
     MAX_REMEDIATION_RETRIES: int = 2
     REMEDIATION_COOLDOWN_SECONDS: int = 300
+    ALLOWLISTED_REMEDIATION_ACTIONS: List[str] = [
+        "restart_service",
+        "restart_servicepulse_agent",
+        "run_diagnostic_check",
+        "recheck_network_endpoint",
+        "notify_administrator",
+    ]
 
     # Service Level Agreement (SLA) Configuration
     SLA_TARGET_PERCENT: float = 99.5

@@ -8,6 +8,12 @@ from backend.app.models.agent import Agent, AgentCommand, AgentTelemetry
 from backend.app.models.audit import AuditLog
 from backend.app.models.incident import Incident, IncidentEvent
 from backend.app.models.inventory import Building, Device, Floor, Room
+from backend.app.models.monitoring import (
+    DeviceMonitoringConfig,
+    DeviceStateTransition,
+    MaintenanceWindow,
+    OutageInterval,
+)
 from backend.app.models.network import NetworkCheck
 from backend.app.models.organization import Organization
 from backend.app.models.remediation import RemediationExecution, RemediationRule
@@ -35,6 +41,10 @@ __all__ = [
     "Floor",
     "Room",
     "Device",
+    "DeviceMonitoringConfig",
+    "DeviceStateTransition",
+    "OutageInterval",
+    "MaintenanceWindow",
     "Agent",
     "AgentTelemetry",
     "AgentCommand",

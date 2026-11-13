@@ -47,6 +47,17 @@ from backend.app.schemas.inventory import (
     RoomRead,
     RoomUpdate,
 )
+from backend.app.schemas.monitoring import (
+    DeviceMonitoringConfigRead,
+    DeviceMonitoringConfigUpdate,
+    DeviceStatusResponse,
+    MaintenanceWindowCreate,
+    MaintenanceWindowRead,
+    NetworkHealthResponse,
+    OutageIntervalRead,
+    ProbeRequest,
+    ProbeResult,
+)
 from backend.app.schemas.network import NetworkCheckRead
 from backend.app.schemas.organization import (
     OrganizationCreate,
@@ -54,10 +65,16 @@ from backend.app.schemas.organization import (
     OrganizationUpdate,
 )
 from backend.app.schemas.remediation import (
+    NotifyAdminParams,
+    RecheckNetworkParams,
+    RemediationApprovalRequest,
     RemediationExecutionCreate,
     RemediationExecutionRead,
     RemediationRuleCreate,
     RemediationRuleRead,
+    RestartAgentParams,
+    RestartServiceParams,
+    RunDiagnosticParams,
 )
 from backend.app.schemas.ticket import (
     SoftwareRequestCreate,
@@ -122,6 +139,21 @@ __all__ = [
     "AgentTelemetryRead",
     "AgentCommandRead",
     "NetworkCheckRead",
+    "DeviceMonitoringConfigRead",
+    "DeviceMonitoringConfigUpdate",
+    "ProbeRequest",
+    "ProbeResult",
+    "DeviceStatusResponse",
+    "NetworkHealthResponse",
+    "OutageIntervalRead",
+    "MaintenanceWindowCreate",
+    "MaintenanceWindowRead",
+    "RestartServiceParams",
+    "RestartAgentParams",
+    "RunDiagnosticParams",
+    "RecheckNetworkParams",
+    "NotifyAdminParams",
+    "RemediationApprovalRequest",
     "RemediationRuleCreate",
     "RemediationRuleRead",
     "RemediationExecutionCreate",

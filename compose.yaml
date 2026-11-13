@@ -58,6 +58,36 @@ services:
     networks:
       - servicepulse-net
 
+  network-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: servicepulse-network-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password_2026}@db:5432/${POSTGRES_DB:-servicepulse}
+      ENVIRONMENT: development
+      DEBUG: "true"
+      SECRET_KEY: ${SECRET_KEY:-insecure-default-change-in-production-servicepulse-security-token-key}
+      MONITORING_INTERVAL_SECONDS: "30"
+      MONITORING_CONCURRENCY_LIMIT: "10"
+      CONSECUTIVE_FAILURE_THRESHOLD: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: python -m backend.app.workers.network_worker
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./backend:/app/backend
+    networks:
+      - servicepulse-net
+
 volumes:
   pgdata:
     name: servicepulse-pgdata

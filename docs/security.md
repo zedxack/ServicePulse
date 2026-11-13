@@ -27,12 +27,16 @@
 ## 3. Remote Execution Safety & Zero Arbitrary Script Execution
 
 - **Strict Allowlisting:** Remote agents and backend workers reject arbitrary shell scripts or PowerShell commands.
-- **Pre-Approved Remediation Actions:** Only rigidly defined action codes are recognized:
-  - `restart_service` (with validated `service_name`)
-  - `check_network` (with target IP/hostname)
-  - `restart_agent`
-  - `install_approved_software` (triggered exclusively through approved software requests)
-- **Two-Man Rule (Approval Gating):** Actions marked with `requires_approval=True` cannot execute automatically; they enter a `pending_approval` state requiring explicit confirmation by an authorized administrator.
+- **Pre-Approved Remediation Actions:** Only rigidly defined action codes with Pydantic schema validation are recognized:
+  - `restart_service` (with validated alphanumeric `service_name`)
+  - `restart_servicepulse_agent` (self-managed service restart)
+  - `run_diagnostic_check` (allowlisted types: `network_summary`, `service_status`, `disk_health`)
+  - `recheck_network_endpoint` (with validated port and timeout)
+  - `notify_administrator` (with constrained channel and message size)
+- **Two-Man Rule (Approval Gating):** Actions marked with `requires_approval=True` cannot execute automatically; they enter a `pending_approval` state requiring explicit confirmation by an authorized administrator (`POST /api/v1/remediations/executions/{id}/approve`).
+- **Network Monitoring Target Authorization:** Probing is restricted to explicitly authorized devices (`is_monitored=True`, `is_authorized=True`) within active tenants. Unauthorized IPs and loopback destinations are dropped at the scheduler.
+- **Safe Simulation Mode:** Test/demo execution records carry `is_simulation=True` and verify as `simulated_verification`, strictly preventing them from falsifying production uptime or audit success metrics.
+
 
 ---
 

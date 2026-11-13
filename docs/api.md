@@ -104,3 +104,37 @@
 | `GET` | `/api/v1/software/requests/{id}` | Retrieve software request by ID | Request Author or Admin |
 | `POST` | `/api/v1/software/requests/{id}/approve` | Approve request & dispatch agent command | Admin, Company Admin, IT Admin |
 | `POST` | `/api/v1/software/requests/{id}/reject` | Reject software request with reason | Admin, Company Admin, IT Admin |
+
+---
+
+## 8. Network Monitoring & Maintenance (`/network`)
+
+| Method | Endpoint | Description | Authorization |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/network/health` | Network worker daemon operational health & probe totals | Platform Super Admin, Company Admin, IT Admin, Support |
+| `GET` | `/api/v1/network/checks` | Paginated network probe history (filterable by device/success) | Platform Super Admin, Company Admin, IT Admin, Support |
+| `GET` | `/api/v1/network/devices/{id}/checks` | Historical probe results for a specific device | SysAdmin, IT Support, Company Admin |
+| `POST` | `/api/v1/network/devices/{id}/probe` | Trigger an on-demand ICMP or TCP probe | IT Admin, Support, Admin |
+| `GET` | `/api/v1/network/devices/{id}/status` | Device monitoring configuration and reachability status | IT Admin, Support, Company Admin |
+| `PATCH` | `/api/v1/network/devices/{id}/config` | Update monitoring configuration (thresholds, ports, intervals) | IT Admin, Company Admin, Admin |
+| `GET` | `/api/v1/network/devices/{id}/outages` | List verified outage intervals for a device | IT Admin, Support, Company Admin |
+| `POST` | `/api/v1/network/maintenance` | Schedule planned maintenance window (excludes SLA downtime) | IT Admin, Company Admin, Admin |
+| `GET` | `/api/v1/network/maintenance` | List active and upcoming maintenance windows | IT Admin, Support, Company Admin |
+
+---
+
+## 9. Automated Remediation & Approval Engine (`/remediations`)
+
+| Method | Endpoint | Description | Authorization |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/remediations/rules` | Create allowlisted automated remediation rule | Platform Super Admin, Company Admin, IT Admin, Support |
+| `GET` | `/api/v1/remediations/rules` | List remediation rules for tenant organization | Responders (IT Admin, Support, Admin) |
+| `GET` | `/api/v1/remediations/rules/{id}` | Retrieve specific remediation rule | Responders (IT Admin, Support, Admin) |
+| `PATCH` | `/api/v1/remediations/rules/{id}` | Update remediation rule configuration | Responders (IT Admin, Support, Admin) |
+| `POST` | `/api/v1/remediations/executions` | Trigger or record a remediation execution | Responders (IT Admin, Support, Admin) |
+| `GET` | `/api/v1/remediations/executions` | List remediation execution history | Responders (IT Admin, Support, Admin) |
+| `GET` | `/api/v1/remediations/executions/{id}` | Retrieve remediation execution details | Responders (IT Admin, Support, Admin) |
+| `POST` | `/api/v1/remediations/executions/{id}/approve` | Approve pending remediation action & dispatch command | Admin, Company Admin, IT Admin |
+| `POST` | `/api/v1/remediations/executions/{id}/reject` | Reject pending remediation action | Admin, Company Admin, IT Admin |
+| `POST` | `/api/v1/remediations/executions/{id}/verify` | Perform observable evidence verification on execution | Responders (IT Admin, Support, Admin) |
+

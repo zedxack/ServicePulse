@@ -22,8 +22,10 @@ from backend.app.models.agent import Agent, AgentTelemetry
 from backend.app.models.audit import AuditLog
 from backend.app.models.incident import Incident
 from backend.app.models.inventory import Building, Device, Floor, Room
+from backend.app.models.monitoring import DeviceStateTransition, OutageInterval
 from backend.app.models.network import NetworkCheck
 from backend.app.models.organization import Organization
+from backend.app.models.remediation import RemediationExecution
 from backend.app.models.ticket import SoftwareRequest, Ticket
 from backend.app.models.user import User
 from backend.app.schemas.dashboard import (
@@ -237,6 +239,37 @@ class DashboardService:
             total_telemetry_records=total_tel or 0,
         )
 
+        # 6. Outage & Remediation Status Metrics
+        outages_q = select(func.count(OutageInterval.id)).where(OutageInterval.ended_at.is_(None))
+        pending_rem_q = select(func.count(RemediationExecution.id)).where(
+            RemediationExecution.status.in_(["pending_approval", "pending", "executing"])
+        )
+        verified_rem_q = select(func.count(RemediationExecution.id)).where(
+            RemediationExecution.verification_status == "verified_success"
+        )
+        failed_rem_q = select(func.count(RemediationExecution.id)).where(
+            RemediationExecution.verification_status == "verification_failed"
+        )
+        rec_recov_q = select(func.count(DeviceStateTransition.id)).join(
+            Device, DeviceStateTransition.device_id == Device.id
+        ).where(
+            DeviceStateTransition.to_status == "online",
+            DeviceStateTransition.from_status == "offline"
+        )
+
+        if scoped_org_id is not None:
+            outages_q = outages_q.where(OutageInterval.organization_id == scoped_org_id)
+            pending_rem_q = pending_rem_q.join(Incident, RemediationExecution.incident_id == Incident.id).where(Incident.organization_id == scoped_org_id)
+            verified_rem_q = verified_rem_q.join(Incident, RemediationExecution.incident_id == Incident.id).where(Incident.organization_id == scoped_org_id)
+            failed_rem_q = failed_rem_q.join(Incident, RemediationExecution.incident_id == Incident.id).where(Incident.organization_id == scoped_org_id)
+            rec_recov_q = rec_recov_q.where(Device.organization_id == scoped_org_id)
+
+        active_outages = (await db.execute(outages_q)).scalar() or 0
+        pending_rem = (await db.execute(pending_rem_q)).scalar() or 0
+        verified_rem = (await db.execute(verified_rem_q)).scalar() or 0
+        failed_rem = (await db.execute(failed_rem_q)).scalar() or 0
+        recent_recov = (await db.execute(rec_recov_q)).scalar() or 0
+
         return SysAdminDashboardResponse(
             timestamp=now,
             organization_id=scoped_org_id,
@@ -253,6 +286,11 @@ class DashboardService:
             agents_offline=agents_offline,
             devices_by_building=devices_by_bld,
             telemetry_summary=telemetry_summary,
+            active_outages_count=active_outages,
+            pending_remediations_count=pending_rem,
+            verified_remediations_count=verified_rem,
+            failed_remediations_count=failed_rem,
+            recent_recoveries_count=recent_recov,
         )
 
     # -------------------------------------------------------------------------

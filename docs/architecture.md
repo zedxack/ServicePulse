@@ -90,3 +90,26 @@ ServicePulse provides 5 tailored dashboard experiences matching organizational r
 | `support` | Organization | Resolve incidents, manage tickets, inspect devices and agent telemetry. |
 | `executive` | Organization | Read-only executive dashboards (SLA, MTTD, MTTR, business impact, trends). |
 | `employee` | User self-service | Submit support tickets, track own tickets, request software installation. |
+
+---
+
+## 5. Independent Network Worker & Remediation Engine (Step 3)
+
+The monitoring and remediation subsystem runs independently of the web API:
+
+- **Network Worker Daemon (`backend/app/workers/network_worker.py`):** Runs as a standalone background service (`servicepulse-network-worker`).
+- **Probe Engine (`backend/app/workers/probe_engine.py`):** Non-blocking ICMP ping subprocesses, TCP socket probes, and deterministic simulation adapters with microsecond latency measurement.
+- **Incident & Outage Processor (`backend/app/workers/incident_processor.py`):** Manages consecutive failure thresholds (warning at 1, offline at threshold), maintains verified `OutageInterval` records, deduplicates incidents using tenant hashes, and executes automated recovery workflows upon probe success.
+- **Automated Remediation Engine (`backend/app/services/remediation_service.py`):** Enforces strict allowlisting, parameter validation, cooldown windows, retry limits, and human-in-the-loop approval workflows before dispatching remediation commands.
+- **Verification Service (`backend/app/services/remediation_verification.py`):** Validates post-remediation health through observable evidence, flagging simulation executions explicitly.
+
+---
+
+## 6. Duration-Based Historical Uptime Foundation
+
+Unlike point-in-time snapshot ratios, contractual SLA uptime must be duration-based:
+
+- **Verified Outage Intervals:** Downtime is measured by summing exact durations of closed and ongoing `OutageInterval` records within the observation window (e.g. 30 days).
+- **Maintenance Window Exclusion:** Scheduled maintenance windows (`MaintenanceWindow`) are excluded from SLA downtime penalties if approved and active.
+- **Insufficient Data Protection:** If historical probe observation count is insufficient for a statistically valid measurement, `uptime_status="insufficient_data"` is reported with `measured_uptime_percent=null` rather than misleading the user.
+

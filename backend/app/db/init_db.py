@@ -22,6 +22,7 @@ from backend.app.models import (
     AuditLog,
     Building,
     Device,
+    DeviceMonitoringConfig,
     Floor,
     NetworkCheck,
     Organization,
@@ -333,6 +334,26 @@ async def init_db(db: AsyncSession) -> None:
                     checked_at=check_time,
                 )
                 db.add(nc)
+            # Seed monitoring configuration
+            cfg_q = select(DeviceMonitoringConfig).where(DeviceMonitoringConfig.device_id == d.id)
+            existing_cfg = (await db.execute(cfg_q)).scalar_one_or_none()
+            if not existing_cfg:
+                tcp_p = "80,443"
+                if d.device_type == "router":
+                    tcp_p = "80,443,8291"
+                elif d.device_type == "ip_camera":
+                    tcp_p = "554,80"
+                db.add(DeviceMonitoringConfig(
+                    device_id=d.id,
+                    is_enabled=True,
+                    is_authorized=True,
+                    ping_enabled=True,
+                    tcp_ports=tcp_p,
+                    check_interval_seconds=30,
+                    timeout_seconds=3.0,
+                    consecutive_failure_threshold=3,
+                    simulation_mode=True,
+                ))
         await db.flush()
 
     # 6. Automated Remediation Rules

@@ -21,6 +21,10 @@ from backend.app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from backend.app.models.agent import Agent, AgentCommand
     from backend.app.models.incident import Incident
+    from backend.app.models.monitoring import (
+        DeviceMonitoringConfig,
+        DeviceStateTransition,
+    )
     from backend.app.models.network import NetworkCheck
     from backend.app.models.organization import Organization
 
@@ -146,4 +150,16 @@ class Device(Base, TimestampMixin):
     commands: Mapped[List["AgentCommand"]] = relationship(
         "AgentCommand",
         back_populates="device"
+    )
+    monitoring_config: Mapped[Optional["DeviceMonitoringConfig"]] = relationship(
+        "DeviceMonitoringConfig",
+        back_populates="device",
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
+    state_transitions: Mapped[List["DeviceStateTransition"]] = relationship(
+        "DeviceStateTransition",
+        back_populates="device",
+        cascade="all, delete-orphan",
+        order_by="desc(DeviceStateTransition.transition_at)"
     )

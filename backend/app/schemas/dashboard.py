@@ -97,6 +97,11 @@ class SysAdminDashboardResponse(BaseModel):
     agents_offline: int
     devices_by_building: List[BuildingDeviceStatus]
     telemetry_summary: TelemetrySummary
+    active_outages_count: int = 0
+    pending_remediations_count: int = 0
+    verified_remediations_count: int = 0
+    failed_remediations_count: int = 0
+    recent_recoveries_count: int = 0
 
 
 # 4. CEO / EXECUTIVE DASHBOARD

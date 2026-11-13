@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     Float,
     ForeignKey,
@@ -140,6 +141,13 @@ class AgentCommand(Base, TimestampMixin):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
+    remediation_execution_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("remediation_executions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    is_simulation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 

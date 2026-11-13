@@ -19,6 +19,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from backend.app.models.agent import AgentCommand
     from backend.app.models.incident import Incident
     from backend.app.models.inventory import Device
     from backend.app.models.organization import Organization
@@ -79,6 +80,14 @@ class RemediationExecution(Base, TimestampMixin):
         nullable=True,
         index=True
     )
+    agent_command_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("agent_commands.id", ondelete="SET NULL", use_alter=True, name="fk_remediation_executions_agent_command_id"),
+        nullable=True,
+        index=True
+    )
+    is_simulation: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Status: pending_approval, approved, rejected, executing, success, failure
     status: Mapped[str] = mapped_column(String(30), default="pending_approval", nullable=False, index=True)
@@ -100,4 +109,5 @@ class RemediationExecution(Base, TimestampMixin):
     rule: Mapped[RemediationRule] = relationship("RemediationRule", back_populates="executions")
     incident: Mapped["Incident"] = relationship("Incident", back_populates="remediation_executions")
     device: Mapped[Optional["Device"]] = relationship("Device")
+    agent_command: Mapped[Optional["AgentCommand"]] = relationship("AgentCommand", foreign_keys=[agent_command_id])
     approved_by: Mapped[Optional["User"]] = relationship("User")

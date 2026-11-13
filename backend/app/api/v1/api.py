@@ -12,6 +12,7 @@ from backend.app.api.v1.endpoints import (
     health,
     incidents,
     inventory,
+    network,
     organizations,
     remediation,
     software,
@@ -31,3 +32,4 @@ api_router.include_router(software.router, prefix="/software", tags=["software"]
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(audit.router, prefix="/audit", tags=["audit"])
 api_router.include_router(remediation.router, prefix="/remediations", tags=["remediations"])
+api_router.include_router(network.router, prefix="/network", tags=["network"])
