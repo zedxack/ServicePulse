@@ -11,10 +11,11 @@ from typing import List, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from backend.app.core.config import settings
 from backend.app.core.dependencies import hash_agent_token
-from backend.app.models.agent import Agent, AgentTelemetry
+from backend.app.models.agent import Agent, AgentCommand, AgentTelemetry
 from backend.app.models.audit import AuditLog
 from backend.app.models.inventory import Device
 from backend.app.schemas.agent import (
@@ -243,3 +244,36 @@ class AgentService:
         )
         result = await db.execute(q)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def get_agent_commands(
+        agent_id: int,
+        skip: int,
+        limit: int,
+        db: AsyncSession,
+        scoped_org_id: Optional[int] = None
+    ) -> List[AgentCommand]:
+        agent = await AgentService.get_agent_by_id(agent_id, db, scoped_org_id=scoped_org_id)
+        q = (
+            select(AgentCommand)
+            .where(AgentCommand.agent_id == agent.id)
+            .order_by(AgentCommand.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(q)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_command_by_id(
+        command_id: int,
+        db: AsyncSession,
+        scoped_org_id: Optional[int] = None
+    ) -> AgentCommand:
+        q = select(AgentCommand).options(selectinload(AgentCommand.agent)).where(AgentCommand.id == command_id)
+        cmd = (await db.execute(q)).scalar_one_or_none()
+        if not cmd:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
+        if scoped_org_id is not None and cmd.agent and cmd.agent.organization_id != scoped_org_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
+        return cmd

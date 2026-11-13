@@ -198,6 +198,52 @@ async def test_cross_tenant_isolation_all_eight_resources(client: AsyncClient):
     assert len(b_audits) > 0
     org_b_audit_id = b_audits[0]["id"]
 
+    # Org B adds Ticket Comment
+    res_cmt_b = await client.post(
+        f"/api/v1/tickets/{org_b_ticket_id}/comments",
+        json={"comment": "Internal Org B comment"},
+        headers=b_admin_h,
+    )
+    assert res_cmt_b.status_code == 201
+
+    # Org B approves software request to generate AgentCommand
+    res_app_b = await client.post(
+        f"/api/v1/software/requests/{org_b_software_req_id}/approve",
+        json={"review_notes": "Approved for Org B core network"},
+        headers=b_admin_h,
+    )
+    assert res_app_b.status_code == 200
+    b_cmds = (await client.get(f"/api/v1/agent/{org_b_agent_id}/commands", headers=b_admin_h)).json()
+    assert len(b_cmds) > 0
+    org_b_cmd_id = b_cmds[0]["id"]
+
+    # Org B creates Remediation Rule
+    res_rule_b = await client.post(
+        "/api/v1/remediations/rules",
+        json={
+            "name": "Org B Auto-Remediation",
+            "trigger_condition": "agent_offline",
+            "target_device_type": "workstation",
+            "action_name": "restart_service",
+        },
+        headers=b_admin_h,
+    )
+    assert res_rule_b.status_code == 201
+    org_b_rule_id = res_rule_b.json()["id"]
+
+    # Org B creates Remediation Execution
+    res_exc_b = await client.post(
+        "/api/v1/remediations/executions",
+        json={
+            "rule_id": org_b_rule_id,
+            "incident_id": org_b_incident_id,
+            "device_id": org_b_device_id,
+        },
+        headers=b_admin_h,
+    )
+    assert res_exc_b.status_code == 201
+    org_b_exc_id = res_exc_b.json()["id"]
+
     # -------------------------------------------------------------------------
     # 2. Company A Admin (Org 1) attempts cross-tenant access to all 8 entities
     # -------------------------------------------------------------------------
@@ -235,6 +281,231 @@ async def test_cross_tenant_isolation_all_eight_resources(client: AsyncClient):
     # 8. Audit Record Isolation
     r_audit = await client.get(f"/api/v1/audit/{org_b_audit_id}", headers=comp_a_h)
     assert r_audit.status_code == 404, f"Cross-tenant audit access did not return 404: {r_audit.status_code}"
+
+    # 9. Nested NetworkCheck Isolation
+    r_nc = await client.get(f"/api/v1/inventory/devices/{org_b_device_id}/network-checks", headers=comp_a_h)
+    assert r_nc.status_code == 404, f"Cross-tenant device network checks did not return 404: {r_nc.status_code}"
+
+    # 10. Nested IncidentEvent Isolation
+    r_events = await client.get(f"/api/v1/incidents/{org_b_incident_id}/events", headers=comp_a_h)
+    assert r_events.status_code == 404, f"Cross-tenant incident events did not return 404: {r_events.status_code}"
+
+    # 11. Nested TicketComments Isolation (both read and post)
+    r_cmts = await client.get(f"/api/v1/tickets/{org_b_ticket_id}/comments", headers=comp_a_h)
+    assert r_cmts.status_code == 404, f"Cross-tenant ticket comments get did not return 404: {r_cmts.status_code}"
+
+    r_post_cmt = await client.post(
+        f"/api/v1/tickets/{org_b_ticket_id}/comments",
+        json={"comment": "Cross-tenant intrusion comment attempt"},
+        headers=comp_a_h,
+    )
+    assert r_post_cmt.status_code == 404, f"Cross-tenant ticket comment post did not return 404: {r_post_cmt.status_code}"
+
+    # 12. Nested AgentCommands Isolation (both list and single command)
+    r_cmds = await client.get(f"/api/v1/agent/{org_b_agent_id}/commands", headers=comp_a_h)
+    assert r_cmds.status_code == 404, f"Cross-tenant agent commands did not return 404: {r_cmds.status_code}"
+
+    r_cmd_single = await client.get(f"/api/v1/agent/commands/{org_b_cmd_id}", headers=comp_a_h)
+    assert r_cmd_single.status_code == 404, f"Cross-tenant single command did not return 404: {r_cmd_single.status_code}"
+
+    # 13. RemediationRule Isolation
+    r_rule = await client.get(f"/api/v1/remediations/rules/{org_b_rule_id}", headers=comp_a_h)
+    assert r_rule.status_code == 404, f"Cross-tenant remediation rule did not return 404: {r_rule.status_code}"
+
+    # 14. RemediationExecution Isolation (get single and list)
+    r_exc = await client.get(f"/api/v1/remediations/executions/{org_b_exc_id}", headers=comp_a_h)
+    assert r_exc.status_code == 404, f"Cross-tenant remediation execution did not return 404: {r_exc.status_code}"
+
+    r_excs_a = await client.get("/api/v1/remediations/executions", headers=comp_a_h)
+    assert r_excs_a.status_code == 200
+    a_exec_ids = [e["id"] for e in r_excs_a.json()]
+    assert org_b_exc_id not in a_exec_ids, "Cross-tenant remediation execution leaked into Company A execution list"
+
+
+@pytest.mark.asyncio
+async def test_parent_resource_ownership_enforcement(client: AsyncClient):
+    """
+    Verify parent-resource ownership is strictly validated during resource creation:
+    1. Creating a Floor with building_id in another tenant -> 404
+    2. Creating a Room with floor_id in another tenant -> 404
+    3. Creating a Device with room_id in another tenant -> 400
+    4. Creating an Incident with device_id in another tenant -> 400
+    5. Creating a Ticket with device_id in another tenant -> 400
+    6. Creating a SoftwareRequest with device_id in another tenant -> 400
+    """
+    super_tok = await get_token(client, "admin@servicepulse.uz", "AdminPass2026!")
+    super_h = {"Authorization": f"Bearer {super_tok}"}
+
+    # Create Org B
+    res_b = await client.post(
+        "/api/v1/organizations",
+        json={"name": "Org B Hierarchy Test", "slug": "org-b-hier", "max_devices": 10},
+        headers=super_h,
+    )
+    org_b_id = res_b.json()["id"]
+
+    # Create Org B Building, Floor, Room, Device
+    await client.post(
+        "/api/v1/auth/users",
+        json={
+            "email": "admin_hier@orgb.uz",
+            "password": "PasswordOrgB2026!",
+            "full_name": "Org B Hier Admin",
+            "role_names": ["company_admin"],
+            "organization_id": org_b_id,
+        },
+        headers=super_h,
+    )
+    b_admin_tok = await get_token(client, "admin_hier@orgb.uz", "PasswordOrgB2026!")
+    b_admin_h = {"Authorization": f"Bearer {b_admin_tok}"}
+
+    bld_b = (await client.post(
+        "/api/v1/inventory/buildings",
+        json={"name": "Org B Main Hub", "code": "HUB-B"},
+        headers=b_admin_h,
+    )).json()
+
+    flr_b = (await client.post(
+        "/api/v1/inventory/floors",
+        json={"building_id": bld_b["id"], "level": 1, "name": "Hub Ground Floor"},
+        headers=b_admin_h,
+    )).json()
+
+    rm_b = (await client.post(
+        "/api/v1/inventory/rooms",
+        json={"floor_id": flr_b["id"], "room_number": "G-01", "name": "NOC Room"},
+        headers=b_admin_h,
+    )).json()
+
+    dev_b = (await client.post(
+        "/api/v1/inventory/devices",
+        json={
+            "room_id": rm_b["id"],
+            "name": "NOC Switch",
+            "hostname": "noc-sw-01",
+            "ip_address": "10.0.1.1",
+            "device_type": "switch",
+        },
+        headers=b_admin_h,
+    )).json()
+
+    inc_b = (await client.post(
+        "/api/v1/incidents",
+        json={
+            "device_id": dev_b["id"],
+            "title": "Org B Hardware Issue",
+            "description": "Switch offline",
+            "severity": "critical",
+        },
+        headers=b_admin_h,
+    )).json()
+
+    # Company A Admin attempts cross-parent creations
+    comp_a_tok = await get_token(client, "company_admin@servicepulse.uz", "CompanyAdminPass2026!")
+    comp_a_h = {"Authorization": f"Bearer {comp_a_tok}"}
+
+    # 1. Floor with Org B building_id
+    r_bad_flr = await client.post(
+        "/api/v1/inventory/floors",
+        json={"building_id": bld_b["id"], "level": 2, "name": "Intrusion Floor"},
+        headers=comp_a_h,
+    )
+    assert r_bad_flr.status_code == 404
+
+    # 2. Room with Org B floor_id
+    r_bad_rm = await client.post(
+        "/api/v1/inventory/rooms",
+        json={"floor_id": flr_b["id"], "room_number": "X-99", "name": "Intrusion Room"},
+        headers=comp_a_h,
+    )
+    assert r_bad_rm.status_code == 404
+
+    # 3. Device with Org B room_id
+    r_bad_dev = await client.post(
+        "/api/v1/inventory/devices",
+        json={
+            "room_id": rm_b["id"],
+            "name": "Intrusion Device",
+            "hostname": "rogue-host",
+            "ip_address": "10.0.99.1",
+            "device_type": "workstation",
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_dev.status_code == 400
+
+    # 4. Incident with Org B device_id
+    r_bad_inc = await client.post(
+        "/api/v1/incidents",
+        json={
+            "device_id": dev_b["id"],
+            "title": "Intrusion Incident",
+            "description": "Cross tenant incident",
+            "severity": "critical",
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_inc.status_code == 400
+
+    # 5. Ticket with Org B device_id
+    r_bad_tkt = await client.post(
+        "/api/v1/tickets",
+        json={
+            "title": "Intrusion Ticket",
+            "description": "Cross tenant ticket",
+            "priority": "high",
+            "device_id": dev_b["id"],
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_tkt.status_code == 400
+
+    # 6. Software Request with Org B device_id
+    r_bad_soft = await client.post(
+        "/api/v1/software/requests",
+        json={
+            "device_id": dev_b["id"],
+            "software_name": "Wireshark",
+            "reason": "Cross tenant software request",
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_soft.status_code == 400
+
+    # 7. RemediationExecution with Org B rule_id
+    r_bad_rule_exec = await client.post(
+        "/api/v1/remediations/executions",
+        json={
+            "rule_id": 99999,
+            "incident_id": inc_b["id"],
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_rule_exec.status_code == 404
+
+    # 8. RemediationExecution with Org B incident_id
+    # Create valid rule in Org A first
+    r_rule_a = await client.post(
+        "/api/v1/remediations/rules",
+        json={
+            "name": "Org A Auto-Restart",
+            "trigger_condition": "service_down",
+            "action_name": "restart_service",
+        },
+        headers=comp_a_h,
+    )
+    assert r_rule_a.status_code == 201
+    rule_a_id = r_rule_a.json()["id"]
+
+    r_bad_inc_exec = await client.post(
+        "/api/v1/remediations/executions",
+        json={
+            "rule_id": rule_a_id,
+            "incident_id": inc_b["id"],
+        },
+        headers=comp_a_h,
+    )
+    assert r_bad_inc_exec.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -514,11 +785,15 @@ async def test_kpi_and_sla_correctness_and_edge_cases(client: AsyncClient):
 
     # SLA target is explicitly 99.5
     assert data["sla_target_percent"] == 99.5
-    # Actual availability is derived from device telemetry/status
-    assert "actual_availability_percent" in data
+    # Current device snapshot availability is distinct from historical SLA
+    assert "current_device_snapshot_percent" in data
     assert "infrastructure_availability_percent" in data
-    assert isinstance(data["actual_availability_percent"], float)
-    assert 0.0 <= data["actual_availability_percent"] <= 100.0
+    assert data["current_device_snapshot_percent"] > 0
+
+    # Demo org has seeded historical probes -> operational
+    assert data["sla_uptime_status"] == "operational"
+    assert data["measured_historical_sla_uptime_percent"] is not None
+    assert data["measured_historical_sla_uptime_percent"] > 0
 
     # With initial seeded state (no resolved incidents with preceding failed probes):
     assert data["mttd_status"] in ["insufficient_data", "operational"]
@@ -526,3 +801,31 @@ async def test_kpi_and_sla_correctness_and_edge_cases(client: AsyncClient):
         assert data["mttd_minutes"] is None
     if data["mttr_status"] == "insufficient_data":
         assert data["mttr_minutes"] is None
+
+    # Now verify a newly created organization with zero historical probes returns insufficient_data
+    res_empty_org = await client.post(
+        "/api/v1/organizations",
+        json={"name": "Zero Probes Org", "slug": "zero-probes-org", "max_devices": 10},
+        headers=super_h,
+    )
+    empty_org_id = res_empty_org.json()["id"]
+
+    await client.post(
+        "/api/v1/auth/users",
+        json={
+            "email": "admin_empty@zeroprobes.uz",
+            "password": "PasswordOrg2026!",
+            "full_name": "Zero Probes Admin",
+            "role_names": ["company_admin"],
+            "organization_id": empty_org_id,
+        },
+        headers=super_h,
+    )
+    empty_tok = await get_token(client, "admin_empty@zeroprobes.uz", "PasswordOrg2026!")
+    empty_h = {"Authorization": f"Bearer {empty_tok}"}
+
+    empty_ceo = (await client.get("/api/v1/dashboard/ceo", headers=empty_h)).json()
+    assert empty_ceo["sla_target_percent"] == 99.5
+    assert empty_ceo["sla_uptime_status"] == "insufficient_data"
+    assert empty_ceo["measured_historical_sla_uptime_percent"] is None
+    assert empty_ceo["sla_achievement_percent"] is None

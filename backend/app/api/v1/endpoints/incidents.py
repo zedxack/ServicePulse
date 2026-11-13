@@ -4,7 +4,7 @@ Concurrency-safe deduplication, incident lifecycle & audit trail
 Multi-tenant isolation enforced.
 Author: Muhammadyusuf Usmonov
 """
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,12 +15,13 @@ from backend.app.core.dependencies import (
     require_roles,
 )
 from backend.app.db.session import get_db
-from backend.app.models.incident import Incident
+from backend.app.models.incident import Incident, IncidentEvent
 from backend.app.models.user import User
 from backend.app.schemas.incident import (
     IncidentAcknowledge,
     IncidentAssign,
     IncidentCreate,
+    IncidentEventRead,
     IncidentListResponse,
     IncidentRead,
     IncidentResolve,
@@ -80,6 +81,21 @@ async def get_incident(
 ) -> Incident:
     scoped_org_id = get_user_tenant_org_id(current_user)
     return await IncidentService.get_incident_by_id(incident_id, db, scoped_org_id=scoped_org_id)
+
+
+@router.get(
+    "/{incident_id}/events",
+    response_model=List[IncidentEventRead],
+    summary="Retrieve incident lifecycle event audit history (tenant-scoped)",
+)
+async def get_incident_events(
+    incident_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[IncidentEvent]:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    incident = await IncidentService.get_incident_by_id(incident_id, db, scoped_org_id=scoped_org_id)
+    return incident.events
 
 
 @router.patch(

@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from backend.app.models.audit import AuditLog
 from backend.app.models.inventory import Building, Device, Floor, Room
+from backend.app.models.network import NetworkCheck
 from backend.app.models.user import User
 from backend.app.schemas.inventory import (
     BuildingCreate,
@@ -360,6 +361,22 @@ class InventoryService:
             details=f"Deleted device {dev.name}",
         ))
         await db.commit()
+
+    @staticmethod
+    async def get_device_network_checks(
+        device_id: int,
+        skip: int,
+        limit: int,
+        db: AsyncSession
+    ) -> List[NetworkCheck]:
+        q = (
+            select(NetworkCheck)
+            .where(NetworkCheck.device_id == device_id)
+            .order_by(NetworkCheck.checked_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list((await db.execute(q)).scalars().all())
 
     # -------------------------------------------------------------------------
     # Hierarchy Tree

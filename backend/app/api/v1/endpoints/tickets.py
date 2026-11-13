@@ -112,6 +112,21 @@ async def add_ticket_comment(
     return await TicketService.add_comment(ticket_id, comment_in, current_user, db, scoped_org_id=scoped_org_id)
 
 
+@router.get(
+    "/{ticket_id}/comments",
+    response_model=List[TicketCommentRead],
+    summary="Retrieve comments for a ticket thread (tenant-scoped)"
+)
+async def get_ticket_comments(
+    ticket_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[TicketComment]:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    ticket = await TicketService.get_ticket_by_id(ticket_id, current_user, db, scoped_org_id=scoped_org_id)
+    return ticket.comments
+
+
 @router.patch(
     "/{ticket_id}/assign",
     response_model=TicketRead,

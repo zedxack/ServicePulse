@@ -104,9 +104,12 @@ class CEODashboardResponse(BaseModel):
     timestamp: datetime
     organization_id: Optional[int] = None
     sla_target_percent: float = 99.5
-    sla_achievement_percent: float
+    sla_achievement_percent: Optional[float] = None
+    current_device_snapshot_percent: float
     infrastructure_availability_percent: float
-    actual_availability_percent: float
+    measured_historical_sla_uptime_percent: Optional[float] = None
+    sla_uptime_status: str = "insufficient_data"
+    actual_availability_percent: Optional[float] = None
     mttd_minutes: Optional[float] = None
     mttr_minutes: Optional[float] = None
     mttd_status: str

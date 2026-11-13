@@ -6,7 +6,7 @@ Author: Muhammadyusuf Usmonov
 Academic Purpose: AT-Servis BMI
 """
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy import update as sa_update
@@ -23,6 +23,7 @@ from backend.app.models import (
     Building,
     Device,
     Floor,
+    NetworkCheck,
     Organization,
     Permission,
     RemediationRule,
@@ -317,6 +318,22 @@ async def init_db(db: AsyncSession) -> None:
             db.add(dev)
         await db.flush()
         logger.info("Created demonstration infrastructure for %s with 6 demo devices.", demo_org.name)
+
+        # Seed baseline historical network check observations for realistic SLA computation
+        demo_devs = (await db.execute(select(Device).where(Device.organization_id == demo_org.id))).scalars().all()
+        for d in demo_devs:
+            for offset_m in [120, 90, 60, 45, 30, 15, 5]:
+                check_time = datetime.now(timezone.utc) - timedelta(minutes=offset_m)
+                nc = NetworkCheck(
+                    device_id=d.id,
+                    check_type="icmp_ping",
+                    is_successful=True,
+                    response_time_ms=2.5,
+                    packet_loss_percent=0.0,
+                    checked_at=check_time,
+                )
+                db.add(nc)
+        await db.flush()
 
     # 6. Automated Remediation Rules
     remediation_rules = [

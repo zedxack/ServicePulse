@@ -262,7 +262,7 @@ class DashboardService:
     async def get_ceo_dashboard(db: AsyncSession, scoped_org_id: Optional[int] = None) -> CEODashboardResponse:
         now = datetime.now(timezone.utc)
 
-        # 1. Availability & SLA
+        # 1. Real-Time Snapshot Availability (Current state of online monitored devices)
         dev_q = select(Device.status, Device.is_monitored)
         if scoped_org_id is not None:
             dev_q = dev_q.where(Device.organization_id == scoped_org_id)
@@ -273,14 +273,31 @@ class DashboardService:
 
         if total_monitored > 0:
             online_count = sum(1 for r in monitored_devices if r.status == "online")
-            availability = round((online_count / total_monitored) * 100.0, 2)
+            snapshot_availability = round((online_count / total_monitored) * 100.0, 2)
         else:
-            availability = 100.0
+            snapshot_availability = 100.0
 
         target_sla = settings.SLA_TARGET_PERCENT
-        sla_achievement = min(round((availability / target_sla) * 100.0, 2), 100.0)
 
-        # 2. MTTD & MTTR (Honest calculations from operational history; no hardcoded defaults)
+        # 2. Measured Historical SLA Uptime (Derived from real network check probe observation history)
+        # Never report current online-device ratio as measured historical SLA
+        nc_q = select(NetworkCheck.is_successful).join(Device, NetworkCheck.device_id == Device.id)
+        if scoped_org_id is not None:
+            nc_q = nc_q.where(Device.organization_id == scoped_org_id)
+        nc_results = list((await db.execute(nc_q)).scalars().all())
+
+        MIN_OBSERVATIONS_THRESHOLD = 5
+        if len(nc_results) >= MIN_OBSERVATIONS_THRESHOLD:
+            success_count = sum(1 for s in nc_results if s)
+            historical_sla_uptime = round((success_count / len(nc_results)) * 100.0, 2)
+            sla_uptime_status = "operational"
+            sla_achievement = min(round((historical_sla_uptime / target_sla) * 100.0, 2), 100.0)
+        else:
+            historical_sla_uptime = None
+            sla_uptime_status = "insufficient_data"
+            sla_achievement = None
+
+        # 3. MTTD & MTTR (Honest calculations from operational history; no hardcoded defaults)
         resolved_q = select(Incident).where(
             Incident.status == "resolved",
             Incident.resolved_at.is_not(None)
@@ -397,7 +414,7 @@ class DashboardService:
             active_risk_level = "HIGH"
 
         impact_summary: Dict[str, str] = {
-            "uptime_status": "Optimal" if availability >= 99.0 else "Degraded",
+            "uptime_status": "Optimal" if snapshot_availability >= 99.0 else "Degraded",
             "business_continuity": "No operational interruptions detected" if total_inc_period == 0 else f"{total_inc_period} incidents tracked across infrastructure",
             "financial_exposure": "None" if active_risk_level == "LOW" else "Low risk of SLA violation",
             "remediation_status": "All automated rules active and standing by",
@@ -408,8 +425,11 @@ class DashboardService:
             organization_id=scoped_org_id,
             sla_target_percent=target_sla,
             sla_achievement_percent=sla_achievement,
-            infrastructure_availability_percent=availability,
-            actual_availability_percent=availability,
+            current_device_snapshot_percent=snapshot_availability,
+            infrastructure_availability_percent=snapshot_availability,
+            measured_historical_sla_uptime_percent=historical_sla_uptime,
+            sla_uptime_status=sla_uptime_status,
+            actual_availability_percent=historical_sla_uptime,
             mttd_minutes=mttd_minutes,
             mttr_minutes=mttr_minutes,
             mttd_status=mttd_status,

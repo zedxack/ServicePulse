@@ -16,6 +16,7 @@ from backend.app.core.dependencies import (
 )
 from backend.app.db.session import get_db
 from backend.app.models.inventory import Building, Device, Floor, Room
+from backend.app.models.network import NetworkCheck
 from backend.app.models.user import User
 from backend.app.schemas.inventory import (
     BuildingCreate,
@@ -30,6 +31,7 @@ from backend.app.schemas.inventory import (
     RoomCreate,
     RoomRead,
 )
+from backend.app.schemas.network import NetworkCheckRead
 from backend.app.services.inventory_service import InventoryService
 
 router = APIRouter()
@@ -219,6 +221,23 @@ async def get_device(
 ) -> Device:
     scoped_org_id = get_user_tenant_org_id(current_user)
     return await InventoryService.get_device_by_id(device_id, db, scoped_org_id=scoped_org_id)
+
+
+@router.get(
+    "/devices/{device_id}/network-checks",
+    response_model=List[NetworkCheckRead],
+    summary="Retrieve network check probes for a device (tenant-scoped)",
+)
+async def get_device_network_checks(
+    device_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=500),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[NetworkCheck]:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    await InventoryService.get_device_by_id(device_id, db, scoped_org_id=scoped_org_id)
+    return await InventoryService.get_device_network_checks(device_id, skip, limit, db)
 
 
 @router.patch(

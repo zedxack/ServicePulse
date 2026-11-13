@@ -91,3 +91,21 @@ class AgentTelemetryRead(BaseModel):
     windows_defender_status: Optional[str] = None
     recorded_at: datetime
     created_at: datetime
+
+
+class AgentCommandRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    agent_id: int
+    device_id: Optional[int] = None
+    action_name: str
+    parameters: Optional[str] = None
+    status: str
+    verification_status: str
+    execution_result: Optional[str] = None
+    verification_result: Optional[str] = None
+    requested_by_user_id: Optional[int] = None
+    executed_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = None
+    created_at: datetime

@@ -14,9 +14,10 @@ from backend.app.core.dependencies import (
     require_roles,
 )
 from backend.app.db.session import get_db
-from backend.app.models.agent import Agent
+from backend.app.models.agent import Agent, AgentCommand
 from backend.app.models.user import User
 from backend.app.schemas.agent import (
+    AgentCommandRead,
     AgentEnrollRequest,
     AgentEnrollResponse,
     AgentHeartbeatRequest,
@@ -128,3 +129,35 @@ async def get_agent_telemetry(
 ) -> List[AgentTelemetryRead]:
     scoped_org_id = get_user_tenant_org_id(current_user)
     return await AgentService.get_agent_telemetry(agent_id, skip, limit, db, scoped_org_id=scoped_org_id)
+
+
+@router.get(
+    "/{agent_id}/commands",
+    response_model=List[AgentCommandRead],
+    summary="List queued commands for an agent (tenant-scoped)",
+    dependencies=[Depends(require_roles("platform_super_admin", "company_admin", "it_admin", "support", "admin"))]
+)
+async def get_agent_commands(
+    agent_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> List[AgentCommand]:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    return await AgentService.get_agent_commands(agent_id, skip, limit, db, scoped_org_id=scoped_org_id)
+
+
+@router.get(
+    "/commands/{command_id}",
+    response_model=AgentCommandRead,
+    summary="Get single agent command by ID (tenant-scoped)",
+    dependencies=[Depends(require_roles("platform_super_admin", "company_admin", "it_admin", "support", "admin"))]
+)
+async def get_agent_command_by_id(
+    command_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> AgentCommand:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    return await AgentService.get_command_by_id(command_id, db, scoped_org_id=scoped_org_id)
