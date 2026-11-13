@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from backend.app.api.v1.endpoints import (
     agent,
+    audit,
     auth,
     dashboard,
     health,
@@ -27,3 +28,4 @@ api_router.include_router(incidents.router, prefix="/incidents", tags=["incident
 api_router.include_router(tickets.router, prefix="/tickets", tags=["tickets"])
 api_router.include_router(software.router, prefix="/software", tags=["software"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+api_router.include_router(audit.router, prefix="/audit", tags=["audit"])

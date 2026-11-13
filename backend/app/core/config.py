@@ -91,5 +91,25 @@ class Settings(BaseSettings):
     MAX_REMEDIATION_RETRIES: int = 2
     REMEDIATION_COOLDOWN_SECONDS: int = 300
 
+    # Service Level Agreement (SLA) Configuration
+    SLA_TARGET_PERCENT: float = 99.5
+
+    # Approved Enterprise Software Catalog
+    APPROVED_SOFTWARE_CATALOG: List[str] = [
+        "7-Zip",
+        "Google Chrome",
+        "Mozilla Firefox",
+        "Visual Studio Code",
+        "Git",
+        "Python",
+        "Node.js",
+        "LibreOffice",
+        "VLC Media Player",
+        "Wireshark",
+        "Wireshark Network Analyzer",
+        "PuTTY",
+        "WinSCP",
+    ]
+
 
 settings = Settings()

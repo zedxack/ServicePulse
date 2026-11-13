@@ -9,9 +9,11 @@ from backend.app.schemas.agent import (
     AgentHeartbeatRequest,
     AgentHeartbeatResponse,
     AgentRead,
+    AgentTelemetryRead,
     AgentTelemetryRequest,
     AgentTelemetryResponse,
 )
+from backend.app.schemas.audit import AuditLogRead
 from backend.app.schemas.dashboard import (
     CEODashboardResponse,
     CompanyDashboardResponse,
@@ -109,6 +111,8 @@ __all__ = [
     "AgentTelemetryRequest",
     "AgentTelemetryResponse",
     "AgentRead",
+    "AgentTelemetryRead",
+    "AuditLogRead",
     "IncidentCreate",
     "IncidentAssign",
     "IncidentAcknowledge",

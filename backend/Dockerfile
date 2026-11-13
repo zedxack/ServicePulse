@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application source code
 COPY backend /app/backend
 COPY pytest.ini /app/pytest.ini
+COPY pyproject.toml /app/pyproject.toml
 
 # Expose port
 EXPOSE 8000

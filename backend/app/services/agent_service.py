@@ -6,6 +6,7 @@ Author: Muhammadyusuf Usmonov
 import secrets
 import uuid
 from datetime import datetime, timezone
+from typing import List, Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -196,3 +197,49 @@ class AgentService:
             is_duplicate=False,
             message="Telemetry successfully recorded",
         )
+
+    @staticmethod
+    async def list_agents(
+        skip: int,
+        limit: int,
+        db: AsyncSession,
+        scoped_org_id: Optional[int] = None
+    ) -> List[Agent]:
+        q = select(Agent).order_by(Agent.id).offset(skip).limit(limit)
+        if scoped_org_id is not None:
+            q = q.where(Agent.organization_id == scoped_org_id)
+        result = await db.execute(q)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_agent_by_id(
+        agent_id: int,
+        db: AsyncSession,
+        scoped_org_id: Optional[int] = None
+    ) -> Agent:
+        q = select(Agent).where(Agent.id == agent_id)
+        agent = (await db.execute(q)).scalar_one_or_none()
+        if not agent:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+        if scoped_org_id is not None and agent.organization_id != scoped_org_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found")
+        return agent
+
+    @staticmethod
+    async def get_agent_telemetry(
+        agent_id: int,
+        skip: int,
+        limit: int,
+        db: AsyncSession,
+        scoped_org_id: Optional[int] = None
+    ) -> List[AgentTelemetry]:
+        agent = await AgentService.get_agent_by_id(agent_id, db, scoped_org_id=scoped_org_id)
+        q = (
+            select(AgentTelemetry)
+            .where(AgentTelemetry.agent_id == agent.id)
+            .order_by(AgentTelemetry.recorded_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await db.execute(q)
+        return list(result.scalars().all())

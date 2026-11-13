@@ -17,10 +17,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.app.core.config import settings
 from backend.app.models.agent import Agent, AgentTelemetry
 from backend.app.models.audit import AuditLog
 from backend.app.models.incident import Incident
 from backend.app.models.inventory import Building, Device, Floor, Room
+from backend.app.models.network import NetworkCheck
 from backend.app.models.organization import Organization
 from backend.app.models.ticket import SoftwareRequest, Ticket
 from backend.app.models.user import User
@@ -275,9 +277,10 @@ class DashboardService:
         else:
             availability = 100.0
 
-        sla_achievement = min(round((availability / 99.5) * 100.0, 2), 100.0)
+        target_sla = settings.SLA_TARGET_PERCENT
+        sla_achievement = min(round((availability / target_sla) * 100.0, 2), 100.0)
 
-        # 2. MTTD & MTTR
+        # 2. MTTD & MTTR (Honest calculations from operational history; no hardcoded defaults)
         resolved_q = select(Incident).where(
             Incident.status == "resolved",
             Incident.resolved_at.is_not(None)
@@ -293,9 +296,35 @@ class DashboardService:
                 if inc.resolved_at and inc.first_seen_at
             ]
             mttr_minutes = round(sum(durations_min) / len(durations_min), 1) if durations_min else None
-            mttd_minutes = 2.5
-            mttd_status = "operational"
-            mttr_status = "operational"
+            mttr_status = "operational" if mttr_minutes is not None else "insufficient_data"
+
+            # MTTD: Mean Time to Detect
+            # Honest calculation: elapsed minutes between first detected probe failure and incident registration
+            mttd_deltas: List[float] = []
+            for inc in resolved_incidents:
+                if inc.device_id and inc.first_seen_at:
+                    probe_q = (
+                        select(NetworkCheck)
+                        .where(
+                            NetworkCheck.device_id == inc.device_id,
+                            NetworkCheck.is_successful.is_(False),
+                            NetworkCheck.checked_at <= inc.first_seen_at,
+                        )
+                        .order_by(NetworkCheck.checked_at.desc())
+                        .limit(1)
+                    )
+                    probe_res = (await db.execute(probe_q)).scalar_one_or_none()
+                    if probe_res and probe_res.checked_at:
+                        diff = (inc.first_seen_at - probe_res.checked_at).total_seconds() / 60.0
+                        if diff >= 0:
+                            mttd_deltas.append(diff)
+
+            if mttd_deltas:
+                mttd_minutes = round(sum(mttd_deltas) / len(mttd_deltas), 1)
+                mttd_status = "operational"
+            else:
+                mttd_minutes = None
+                mttd_status = "insufficient_data"
         else:
             mttd_minutes = None
             mttr_minutes = None
@@ -377,8 +406,10 @@ class DashboardService:
         return CEODashboardResponse(
             timestamp=now,
             organization_id=scoped_org_id,
-            infrastructure_availability_percent=availability,
+            sla_target_percent=target_sla,
             sla_achievement_percent=sla_achievement,
+            infrastructure_availability_percent=availability,
+            actual_availability_percent=availability,
             mttd_minutes=mttd_minutes,
             mttr_minutes=mttr_minutes,
             mttd_status=mttd_status,

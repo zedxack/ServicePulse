@@ -103,8 +103,10 @@ class SysAdminDashboardResponse(BaseModel):
 class CEODashboardResponse(BaseModel):
     timestamp: datetime
     organization_id: Optional[int] = None
-    infrastructure_availability_percent: float
+    sla_target_percent: float = 99.5
     sla_achievement_percent: float
+    infrastructure_availability_percent: float
+    actual_availability_percent: float
     mttd_minutes: Optional[float] = None
     mttr_minutes: Optional[float] = None
     mttd_status: str

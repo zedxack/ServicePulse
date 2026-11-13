@@ -28,6 +28,17 @@ router = APIRouter()
 SOFTWARE_APPROVERS = ("platform_super_admin", "company_admin", "admin", "it_admin")
 
 
+@router.get(
+    "/catalog",
+    response_model=List[str],
+    summary="List approved enterprise software packages available for installation",
+    dependencies=[Depends(get_current_active_user)]
+)
+async def get_software_catalog() -> List[str]:
+    from backend.app.core.config import settings
+    return settings.APPROVED_SOFTWARE_CATALOG
+
+
 @router.post(
     "/requests",
     response_model=SoftwareRequestRead,

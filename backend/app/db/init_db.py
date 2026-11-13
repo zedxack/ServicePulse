@@ -8,7 +8,8 @@ Academic Purpose: AT-Servis BMI
 import asyncio
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update as sa_update
+from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 

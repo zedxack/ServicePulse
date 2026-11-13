@@ -114,3 +114,18 @@ async def update_user_status(
 ) -> User:
     scoped_org_id = get_user_tenant_org_id(current_user)
     return await AuthService.update_user_status(user_id, status_in.is_active, current_user, db, scoped_org_id=scoped_org_id)
+
+
+@router.get(
+    "/users/{user_id}",
+    response_model=UserRead,
+    summary="Get user details by ID (tenant-scoped)",
+    dependencies=[Depends(require_roles("platform_super_admin", "company_admin", "admin"))]
+)
+async def get_user_by_id(
+    user_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    scoped_org_id = get_user_tenant_org_id(current_user)
+    return await AuthService.get_user_by_id(user_id, db, scoped_org_id=scoped_org_id)

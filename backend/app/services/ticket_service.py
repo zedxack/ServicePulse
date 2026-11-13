@@ -3,6 +3,7 @@ ServicePulse - Helpdesk Tickets & Software Approval Service
 Role-based ticket visibility, multi-tenant isolation, employee isolation & software installation workflow.
 Author: Muhammadyusuf Usmonov
 """
+import re
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -11,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.app.core.config import settings
 from backend.app.models.agent import AgentCommand
 from backend.app.models.audit import AuditLog
 from backend.app.models.inventory import Device
@@ -273,12 +275,33 @@ class TicketService:
         if target_org_id is not None and dev.organization_id != target_org_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Device belongs to another organization")
 
+        # Validate software catalog and prevent arbitrary shell injection
+        normalized_name = req_in.software_name.strip()
+        catalog_lookup = {item.lower(): item for item in settings.APPROVED_SOFTWARE_CATALOG}
+        if normalized_name.lower() not in catalog_lookup:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Software '{normalized_name}' is not in the approved software catalog. Allowed packages: {', '.join(settings.APPROVED_SOFTWARE_CATALOG)}"
+            )
+        canonical_software_name = catalog_lookup[normalized_name.lower()]
+
+        # Prevent shell metacharacter injection in version string
+        clean_version = None
+        if req_in.software_version:
+            v_str = req_in.software_version.strip()
+            if not re.match(r"^[a-zA-Z0-9\.\-_+]{1,30}$", v_str):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Software version contains disallowed characters. Shell metacharacters are rejected."
+                )
+            clean_version = v_str
+
         req = SoftwareRequest(
             organization_id=target_org_id,
             user_id=user.id,
             device_id=dev.id,
-            software_name=req_in.software_name.strip(),
-            software_version=req_in.software_version.strip() if req_in.software_version else None,
+            software_name=canonical_software_name,
+            software_version=clean_version,
             reason=req_in.reason.strip(),
             status="pending",
         )
@@ -386,6 +409,17 @@ class TicketService:
                 requested_by_user_id=reviewer.id,
             )
             db.add(cmd)
+            await db.flush()
+
+            db.add(AuditLog(
+                user_id=reviewer.id,
+                organization_id=req.organization_id,
+                action="agent_command_queued",
+                target_resource="agent_command",
+                target_id=str(cmd.id),
+                status="success",
+                details=f"Queued authorized command install_approved_software for {req.software_name} on device {dev.hostname}",
+            ))
 
         db.add(req)
         db.add(AuditLog(

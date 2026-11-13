@@ -63,12 +63,31 @@ class AgentRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    device_id: Optional[int]
+    organization_id: Optional[int] = None
+    device_id: Optional[int] = None
     agent_uuid: str
     status: str
     version: str
     hostname: str
     ip_address: str
-    os_name: Optional[str]
-    last_seen: Optional[datetime]
+    os_name: Optional[str] = None
+    last_seen: Optional[datetime] = None
+    created_at: datetime
+
+
+class AgentTelemetryRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    agent_id: int
+    cpu_percent: float
+    ram_percent: float
+    ram_used_mb: float
+    ram_total_mb: float
+    disk_percent: float
+    disk_used_gb: float
+    disk_total_gb: float
+    windows_activation_status: Optional[str] = None
+    windows_defender_status: Optional[str] = None
+    recorded_at: datetime
     created_at: datetime
