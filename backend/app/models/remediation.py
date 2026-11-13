@@ -21,6 +21,7 @@ from backend.app.db.base import Base, TimestampMixin
 if TYPE_CHECKING:
     from backend.app.models.incident import Incident
     from backend.app.models.inventory import Device
+    from backend.app.models.organization import Organization
     from backend.app.models.user import User
 
 
@@ -28,6 +29,12 @@ class RemediationRule(Base, TimestampMixin):
     __tablename__ = "remediation_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
     name: Mapped[str] = mapped_column(String(150), nullable=False, unique=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -43,6 +50,7 @@ class RemediationRule(Base, TimestampMixin):
     max_retries: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
     cooldown_seconds: Mapped[int] = mapped_column(Integer, default=300, nullable=False)
 
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="remediation_rules")
     executions: Mapped[List["RemediationExecution"]] = relationship(
         "RemediationExecution",
         back_populates="rule"

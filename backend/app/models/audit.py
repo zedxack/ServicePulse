@@ -17,6 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.db.base import Base
 
 if TYPE_CHECKING:
+    from backend.app.models.organization import Organization
     from backend.app.models.user import User
 
 
@@ -28,6 +29,12 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     user_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
@@ -50,3 +57,4 @@ class AuditLog(Base):
     )
 
     user: Mapped[Optional["User"]] = relationship("User")
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="audit_logs")

@@ -22,18 +22,26 @@ if TYPE_CHECKING:
     from backend.app.models.agent import Agent, AgentCommand
     from backend.app.models.incident import Incident
     from backend.app.models.network import NetworkCheck
+    from backend.app.models.organization import Organization
 
 
 class Building(Base, TimestampMixin):
     __tablename__ = "buildings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
     name: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     address: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_sample_data: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="buildings")
     floors: Mapped[List["Floor"]] = relationship(
         "Floor",
         back_populates="building",
@@ -93,6 +101,12 @@ class Device(Base, TimestampMixin):
     __tablename__ = "devices"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True
+    )
     room_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("rooms.id", ondelete="SET NULL"),
@@ -118,6 +132,7 @@ class Device(Base, TimestampMixin):
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     room: Mapped[Optional[Room]] = relationship("Room", back_populates="devices")
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="devices")
     agent: Mapped[Optional["Agent"]] = relationship("Agent", back_populates="device", uselist=False)
     network_checks: Mapped[List["NetworkCheck"]] = relationship(
         "NetworkCheck",

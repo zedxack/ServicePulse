@@ -19,12 +19,19 @@ from backend.app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from backend.app.models.inventory import Device
+    from backend.app.models.organization import Organization
 
 
 class Agent(Base, TimestampMixin):
     __tablename__ = "agents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    organization_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("organizations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     device_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("devices.id", ondelete="SET NULL"),
@@ -44,6 +51,7 @@ class Agent(Base, TimestampMixin):
     last_seen: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     device: Mapped[Optional["Device"]] = relationship("Device", back_populates="agent")
+    organization: Mapped[Optional["Organization"]] = relationship("Organization", back_populates="agents")
     telemetry_records: Mapped[List["AgentTelemetry"]] = relationship(
         "AgentTelemetry",
         back_populates="agent",
@@ -78,6 +86,14 @@ class AgentTelemetry(Base, TimestampMixin):
     # Windows-specific system status
     windows_activation_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     windows_defender_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Idempotency key for preventing duplicate telemetry submissions
+    idempotency_key: Mapped[Optional[str]] = mapped_column(
+        String(128),
+        unique=True,
+        nullable=True,
+        index=True
+    )
 
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -1,16 +1,18 @@
 """
 ServicePulse - Database Seeding & Initialization Module
-Populates default roles, administrative accounts, realistic demonstration
-infrastructure (Asosiy Bino -> 2-qavat -> 204-Laboratoriya), and initial rules.
+Populates Multi-Tenant Organizations, 6 RBAC Roles, fine-grained permissions,
+administrative accounts, and realistic demonstration infrastructure.
 Author: Muhammadyusuf Usmonov
 Academic Purpose: AT-Servis BMI
 """
 import asyncio
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
+from backend.app.core.config import settings
 from backend.app.core.logging import logger
 from backend.app.core.security import hash_password
 from backend.app.db.base import Base
@@ -20,6 +22,7 @@ from backend.app.models import (
     Building,
     Device,
     Floor,
+    Organization,
     Permission,
     RemediationRule,
     Role,
@@ -29,21 +32,49 @@ from backend.app.models import (
 
 
 async def init_db(db: AsyncSession) -> None:
-    """Seed initial system data if not already present."""
+    """Seed initial multi-tenant system data if not already present."""
     logger.info("Checking and seeding database initial records...")
 
-    # 1. Standard Permissions
+    # 1. Demonstration Organization
+    result = await db.execute(select(Organization).where(Organization.slug == "demo-org"))
+    demo_org = result.scalar_one_or_none()
+    if not demo_org:
+        demo_org = Organization(
+            name="TATU AT-Servis Lab",
+            slug="demo-org",
+            domain="tatu.uz",
+            is_active=True,
+            max_devices=100,
+        )
+        db.add(demo_org)
+        await db.flush()
+        logger.info("Created demonstration organization: %s (slug: %s)", demo_org.name, demo_org.slug)
+
+    # 2. Granular Permissions
     permissions_data = [
+        ("platform:manage", "Platform Management", "Full administrative control across all organizations"),
+        ("org:manage", "Organization Management", "Manage company settings, limits, and organizational data"),
+        ("users:manage", "User Management", "Create, modify, and deactivate users within organization"),
         ("inventory:read", "Read Inventory", "View buildings, floors, rooms and devices"),
-        ("inventory:write", "Write Inventory", "Create and edit inventory infrastructure"),
-        ("incident:read", "Read Incidents", "View system incidents and events"),
-        ("incident:write", "Manage Incidents", "Assign, comment, and update incidents"),
+        ("inventory:write", "Write Inventory", "Create, edit, and decommission inventory infrastructure"),
+        ("incident:read", "Read Incidents", "View active and historical incidents"),
+        ("incident:write", "Manage Incidents", "Assign, acknowledge, and comment on incidents"),
+        ("incident:resolve", "Resolve Incidents", "Mark incidents as resolved and clear deduplication keys"),
         ("remediation:read", "Read Remediation", "View automated remediation rules and executions"),
         ("remediation:execute", "Execute Remediation", "Trigger or approve automated remediation actions"),
         ("agent:read", "Read Agents", "View enrolled agents and telemetry"),
         ("agent:manage", "Manage Agents", "Enroll, rotate keys, and decommission agents"),
-        ("audit:read", "Read Audit Logs", "Inspect security and administrative audit trails"),
-        ("settings:manage", "Manage Settings", "Configure system-wide settings and monitoring thresholds"),
+        ("ticket:read_all", "Read All Tickets", "View all support tickets across the organization"),
+        ("ticket:manage", "Manage Tickets", "Assign and resolve support tickets"),
+        ("ticket:create", "Create Tickets", "Submit personal support tickets"),
+        ("software:request", "Request Software", "Submit software installation requests"),
+        ("software:approve", "Approve Software", "Approve or reject software installation requests"),
+        ("audit:read", "Read Audit Logs", "Inspect security and operational audit trails"),
+        ("dashboard:platform", "Platform Dashboard", "Access global platform-wide intelligence dashboard"),
+        ("dashboard:company", "Company Dashboard", "Access organization-level management dashboard"),
+        ("dashboard:sysadmin", "SysAdmin Dashboard", "Access live infrastructure and technical operations dashboard"),
+        ("dashboard:executive", "Executive Dashboard", "Access SLA, MTTD, MTTR, and availability dashboard"),
+        ("dashboard:employee", "Employee Dashboard", "Access self-service support tickets and requests dashboard"),
     ]
 
     permission_map = {}
@@ -56,21 +87,78 @@ async def init_db(db: AsyncSession) -> None:
             await db.flush()
         permission_map[code] = perm
 
-    # 2. Standard Roles
+    # 3. Six RBAC Roles
     roles_data = [
-        ("admin", "System Administrator", list(permission_map.values())),
+        (
+            "platform_super_admin",
+            "Platform Super Administrator",
+            list(permission_map.values()),
+        ),
+        (
+            "company_admin",
+            "Company / Organization Administrator",
+            [
+                p for c, p in permission_map.items()
+                if not c.startswith("platform:")
+            ],
+        ),
+        (
+            "it_admin",
+            "Lead IT Infrastructure Administrator",
+            [
+                p for c, p in permission_map.items()
+                if c in [
+                    "inventory:read", "inventory:write",
+                    "incident:read", "incident:write", "incident:resolve",
+                    "remediation:read", "remediation:execute", "remediation:approve",
+                    "agent:read", "agent:manage",
+                    "ticket:read_all", "ticket:manage", "ticket:create",
+                    "software:approve", "software:request",
+                    "audit:read", "dashboard:sysadmin", "dashboard:employee"
+                ]
+            ],
+        ),
         (
             "support",
             "IT Support Engineer",
             [
                 p for c, p in permission_map.items()
-                if c in ["inventory:read", "inventory:write", "incident:read", "incident:write", "remediation:read", "agent:read"]
+                if c in [
+                    "inventory:read", "inventory:write",
+                    "incident:read", "incident:write",
+                    "agent:read",
+                    "ticket:read_all", "ticket:manage", "ticket:create",
+                    "software:request",
+                    "dashboard:sysadmin", "dashboard:employee"
+                ]
+            ],
+        ),
+        (
+            "executive",
+            "CEO / Executive Officer",
+            [
+                p for c, p in permission_map.items()
+                if c in [
+                    "inventory:read", "incident:read",
+                    "dashboard:executive", "dashboard:employee", "audit:read"
+                ]
             ],
         ),
         (
             "employee",
-            "Organization Employee",
-            [p for c, p in permission_map.items() if c in ["inventory:read", "incident:read"]],
+            "Organization Staff Member",
+            [
+                p for c, p in permission_map.items()
+                if c in [
+                    "inventory:read", "ticket:create", "software:request", "dashboard:employee"
+                ]
+            ],
+        ),
+        # Legacy backward-compatibility alias for initial tests
+        (
+            "admin",
+            "Legacy Admin Alias",
+            list(permission_map.values()),
         ),
     ]
 
@@ -82,37 +170,92 @@ async def init_db(db: AsyncSession) -> None:
             role = Role(name=role_name, description=desc, permissions=perms)
             db.add(role)
             await db.flush()
+        else:
+            role.permissions = perms
+            db.add(role)
         role_map[role_name] = role
 
-    # 3. Default Administrative & Demo Users
+    # 4. Default Seed Accounts Across Roles
     users_data = [
-        ("admin@servicepulse.uz", "AdminPass2026!", "System Administrator", ["admin"], True),
-        ("support@servicepulse.uz", "SupportPass2026!", "Support Engineer", ["support"], False),
-        ("employee@servicepulse.uz", "EmployeePass2026!", "Muhammadyusuf Usmonov", ["employee"], False),
+        (
+            settings.FIRST_SUPERUSER_EMAIL,
+            settings.FIRST_SUPERUSER_PASSWORD,
+            "System Administrator",
+            ["platform_super_admin", "admin"],
+            True,
+            demo_org.id,
+        ),
+        (
+            "company_admin@servicepulse.uz",
+            "CompanyAdminPass2026!",
+            "TATU Lab Administrator",
+            ["company_admin"],
+            False,
+            demo_org.id,
+        ),
+        (
+            settings.FIRST_SUPPORT_EMAIL,
+            settings.FIRST_SUPPORT_PASSWORD,
+            "Support Engineer",
+            ["it_admin", "support"],
+            False,
+            demo_org.id,
+        ),
+        (
+            "executive@servicepulse.uz",
+            "ExecutivePass2026!",
+            "University Dean / Executive",
+            ["executive"],
+            False,
+            demo_org.id,
+        ),
+        (
+            settings.FIRST_EMPLOYEE_EMAIL,
+            settings.FIRST_EMPLOYEE_PASSWORD,
+            "Muhammadyusuf Usmonov",
+            ["employee"],
+            False,
+            demo_org.id,
+        ),
     ]
 
-    for email, plain_pw, full_name, user_roles_list, is_super in users_data:
-        result = await db.execute(select(User).where(User.email == email))
+    for email, plain_pw, full_name, user_roles_list, is_super, org_id in users_data:
+        result = await db.execute(select(User).options(selectinload(User.roles)).where(User.email == email))
         user = result.scalar_one_or_none()
+        assigned_roles = [role_map[r] for r in user_roles_list if r in role_map]
         if not user:
-            assigned_roles = [role_map[r] for r in user_roles_list if r in role_map]
             user = User(
                 email=email,
                 hashed_password=hash_password(plain_pw),
                 full_name=full_name,
                 is_active=True,
                 is_superuser=is_super,
+                organization_id=org_id,
                 roles=assigned_roles,
             )
             db.add(user)
             await db.flush()
-            logger.info("Created user: %s (Role: %s)", email, ", ".join(user_roles_list))
+            logger.info("Created user: %s (Roles: %s, Org: %s)", email, ", ".join(user_roles_list), org_id)
+        else:
+            if user.organization_id is None:
+                user.organization_id = org_id
+            user.roles = assigned_roles
+            db.add(user)
 
-    # 4. Realistic Demonstration Infrastructure (Asosiy Bino -> 2-qavat -> 204-Laboratoriya)
+    # Ensure buildings and devices have organization_id set
+    await db.execute(
+        sa_update(Building).where(Building.organization_id.is_(None)).values(organization_id=demo_org.id)
+    )
+    await db.execute(
+        sa_update(Device).where(Device.organization_id.is_(None)).values(organization_id=demo_org.id)
+    )
+
+    # 5. Realistic Demonstration Infrastructure (Asosiy Bino -> 2-qavat -> 204-Laboratoriya)
     result = await db.execute(select(Building).where(Building.code == "BLD-MAIN"))
     main_bld = result.scalar_one_or_none()
     if not main_bld:
         main_bld = Building(
+            organization_id=demo_org.id,
             name="Asosiy Bino",
             code="BLD-MAIN",
             address="Toshkent shahri, Universitet ko'chasi 7",
@@ -144,7 +287,7 @@ async def init_db(db: AsyncSession) -> None:
         db.add(room_204)
         await db.flush()
 
-        # Devices (Sample Infrastructure)
+        # Demo Devices
         demo_devices = [
             ("SRV-MAIN-01", "srv-main-01.servicepulse.local", "192.168.10.10", "00:1A:2B:3C:4D:01", "server", "Windows Server 2022"),
             ("RTR-MIKROTIK-CORE", "gw-core.servicepulse.local", "192.168.10.1", "00:1A:2B:3C:4D:02", "router", "RouterOS v7"),
@@ -156,6 +299,7 @@ async def init_db(db: AsyncSession) -> None:
 
         for name, hostname, ip, mac, dtype, os_name in demo_devices:
             dev = Device(
+                organization_id=demo_org.id,
                 room_id=room_204.id,
                 name=name,
                 hostname=hostname,
@@ -171,9 +315,9 @@ async def init_db(db: AsyncSession) -> None:
             )
             db.add(dev)
         await db.flush()
-        logger.info("Created demonstration infrastructure: Asosiy Bino -> 2-qavat -> 204-Laboratoriya with 6 demo devices.")
+        logger.info("Created demonstration infrastructure for %s with 6 demo devices.", demo_org.name)
 
-    # 5. Standard Automated Remediation Rules
+    # 6. Automated Remediation Rules
     remediation_rules = [
         (
             "Restart ServicePulse Agent on High Latency / Service Failure",
@@ -209,6 +353,7 @@ async def init_db(db: AsyncSession) -> None:
         rule = result.scalar_one_or_none()
         if not rule:
             rule = RemediationRule(
+                organization_id=demo_org.id,
                 name=name,
                 description=desc,
                 trigger_condition=trig,
@@ -223,22 +368,22 @@ async def init_db(db: AsyncSession) -> None:
             db.add(rule)
     await db.flush()
 
-    # 6. Initial Audit Log Entry
+    # 7. Initial Audit Record
     audit = AuditLog(
+        organization_id=demo_org.id,
         user_id=None,
         action="system_seed_init",
         target_resource="database",
         target_id="0",
         status="success",
-        details="Initial system seed executed: roles, users, demo infrastructure, remediation rules created.",
+        details="System seed completed with multi-tenant structure, 6 RBAC roles, and demo assets.",
     )
     db.add(audit)
     await db.commit()
-    logger.info("Database seeding completed successfully.")
+    logger.info("Multi-tenant database seeding completed successfully.")
 
 
 async def main() -> None:
-    """Standalone seeding execution entrypoint."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with AsyncSessionLocal() as session:

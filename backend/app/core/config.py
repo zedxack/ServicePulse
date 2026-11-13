@@ -36,6 +36,23 @@ class Settings(BaseSettings):
     # Agent Enrollment
     AGENT_ENROLLMENT_SECRET: str = "servicepulse-agent-enrollment-secret-2026"
 
+    # Initial Administrative & Seed Credentials (override via .env)
+    FIRST_SUPERUSER_EMAIL: str = "admin@servicepulse.uz"
+    FIRST_SUPERUSER_PASSWORD: str = "AdminPass2026!"
+    FIRST_SUPPORT_EMAIL: str = "support@servicepulse.uz"
+    FIRST_SUPPORT_PASSWORD: str = "SupportPass2026!"
+    FIRST_EMPLOYEE_EMAIL: str = "employee@servicepulse.uz"
+    FIRST_EMPLOYEE_PASSWORD: str = "EmployeePass2026!"
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str, info) -> str:
+        # Validate that production environments use secure non-default secrets
+        env = info.data.get("ENVIRONMENT", "development")
+        if env == "production" and ("insecure-default" in v or len(v) < 32):
+            raise ValueError("In production mode, SECRET_KEY must be a secure key with at least 32 characters.")
+        return v
+
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./servicepulse.db"
     POSTGRES_SERVER: str = "localhost"

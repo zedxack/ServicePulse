@@ -3,6 +3,7 @@ ServicePulse - Security and Authentication Module
 Argon2id password hashing & PyJWT token handling
 Author: Muhammadyusuf Usmonov
 """
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -67,9 +68,10 @@ def create_access_token(
 
 def create_refresh_token(
     subject: str,
-    expires_delta: Optional[timedelta] = None
+    expires_delta: Optional[timedelta] = None,
+    jti: Optional[str] = None
 ) -> str:
-    """Generate signed JWT refresh token."""
+    """Generate signed JWT refresh token with unique jti identifier."""
     now = datetime.now(timezone.utc)
     if expires_delta:
         expire = now + expires_delta
@@ -80,7 +82,8 @@ def create_refresh_token(
         "sub": str(subject),
         "iat": now,
         "exp": expire,
-        "type": "refresh"
+        "type": "refresh",
+        "jti": jti or uuid.uuid4().hex
     }
 
     encoded_jwt = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

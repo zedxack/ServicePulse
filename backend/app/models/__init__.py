@@ -9,16 +9,26 @@ from backend.app.models.audit import AuditLog
 from backend.app.models.incident import Incident, IncidentEvent
 from backend.app.models.inventory import Building, Device, Floor, Room
 from backend.app.models.network import NetworkCheck
+from backend.app.models.organization import Organization
 from backend.app.models.remediation import RemediationExecution, RemediationRule
-from backend.app.models.ticket import SoftwareRequest, Ticket
-from backend.app.models.user import Permission, Role, User, role_permissions, user_roles
+from backend.app.models.ticket import SoftwareRequest, Ticket, TicketComment
+from backend.app.models.user import (
+    Permission,
+    RefreshToken,
+    Role,
+    User,
+    role_permissions,
+    user_roles,
+)
 
 __all__ = [
     "Base",
     "TimestampMixin",
+    "Organization",
     "User",
     "Role",
     "Permission",
+    "RefreshToken",
     "user_roles",
     "role_permissions",
     "Building",
@@ -34,6 +44,7 @@ __all__ = [
     "RemediationRule",
     "RemediationExecution",
     "Ticket",
+    "TicketComment",
     "SoftwareRequest",
     "AuditLog",
 ]
