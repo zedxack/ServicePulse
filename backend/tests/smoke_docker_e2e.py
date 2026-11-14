@@ -409,6 +409,133 @@ async def run_smoke_tests():
         assertion_count += 1
         print(f"  [PASS Assertion {assertion_count}] Unauthenticated Request Rejection -> Missing ticket rejected")
 
+        # ------------------------------------------------------------------
+        # SCENARIO 10: Docker End-to-End Invitation Creation & Atomic Redemption
+        # ------------------------------------------------------------------
+        scenario_count += 1
+        print(f"\n[SCENARIO {scenario_count}] End-to-End Docker Invitation Creation, Validation & Redemption")
+
+        # 1. Company Admin logs in through Nginx
+        admin_login = await client.post(
+            f"{BASE_URL}/api/v1/auth/login",
+            json={"email": "company_admin@servicepulse.uz", "password": "CompanyAdminPass2026!"}
+        )
+        assert admin_login.status_code == 200, f"Admin login failed: {admin_login.text}"
+        admin_token = admin_login.json()["access_token"]
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Company Admin Authenticated through Nginx")
+
+        # 2. Company Admin creates single-use invitation for employee
+        inv_create = await client.post(
+            f"{BASE_URL}/api/v1/auth/invitations",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"role_id": 6, "max_uses": 1, "expires_in_days": 2}  # Role 6 = employee
+        )
+        assert inv_create.status_code == 201, f"Invitation creation failed: {inv_create.text}"
+        raw_inv_token = inv_create.json()["raw_token"]
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Created Invitation via Docker Backend -> {raw_inv_token[:13]}...")
+
+        # 3. Validate invitation through Nginx
+        val_res = await client.post(
+            f"{BASE_URL}/api/v1/auth/invitations/validate",
+            json={"invitation_code": raw_inv_token}
+        )
+        assert val_res.status_code == 200
+        assert val_res.json()["valid"] is True
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Invitation Validated through Nginx Proxy")
+
+        # 4. Redeem invitation and join organization
+        unique_suffix = int(time.time()) % 100000
+        join_res = await client.post(
+            f"{BASE_URL}/api/v1/auth/join-organization",
+            json={
+                "invitation_code": raw_inv_token,
+                "full_name": f"Docker E2E User {unique_suffix}",
+                "email": f"docker.user.{unique_suffix}@servicepulse.uz",
+                "password": "DockerSecurePass2026!",
+            }
+        )
+        assert join_res.status_code == 201, f"Join organization failed: {join_res.text}"
+        assert "access_token" in join_res.json()
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Atomic Invitation Redemption Succeeded in PostgreSQL")
+
+        # 5. Verify exhausted token cannot be reused
+        reuse_res = await client.post(
+            f"{BASE_URL}/api/v1/auth/join-organization",
+            json={
+                "invitation_code": raw_inv_token,
+                "full_name": "Second User Attempt",
+                "email": f"second.{unique_suffix}@servicepulse.uz",
+                "password": "DockerSecurePass2026!",
+            }
+        )
+        assert reuse_res.status_code == 400
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Exhausted Single-Use Invitation Rejected (HTTP 400)")
+
+        # ------------------------------------------------------------------
+        # SCENARIO 11: Docker End-to-End Organization Onboarding Workflow
+        # ------------------------------------------------------------------
+        scenario_count += 1
+        print(f"\n[SCENARIO {scenario_count}] End-to-End Docker Organization Onboarding & Super Admin Approval")
+
+        # 1. Submit public onboarding request
+        org_req_res = await client.post(
+            f"{BASE_URL}/api/v1/auth/organization-requests",
+            json={
+                "org_name": f"Docker Test Corp {unique_suffix}",
+                "org_slug": f"docker-corp-{unique_suffix}",
+                "org_email": f"info@dockercorp{unique_suffix}.uz",
+                "contact_full_name": "Docker Applicant",
+                "contact_email": f"applicant.{unique_suffix}@dockercorp.uz",
+                "password": "ApplicantPass2026!",
+            }
+        )
+        assert org_req_res.status_code == 201
+        assert org_req_res.json()["status"] == "pending"
+        req_id = org_req_res.json()["id"]
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Organization Onboarding Request Submitted (status: pending)")
+
+        # 2. Verify applicant cannot log in prior to approval
+        premature_login = await client.post(
+            f"{BASE_URL}/api/v1/auth/login",
+            json={"email": f"applicant.{unique_suffix}@dockercorp.uz", "password": "ApplicantPass2026!"}
+        )
+        assert premature_login.status_code == 401
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Unapproved Applicant Login Blocked (HTTP 401)")
+
+        # 3. Super Admin approves request through Nginx
+        super_login = await client.post(
+            f"{BASE_URL}/api/v1/auth/login",
+            json={"email": "admin@servicepulse.uz", "password": "AdminPass2026!"}
+        )
+        assert super_login.status_code == 200
+        super_tok = super_login.json()["access_token"]
+
+        approve_res = await client.post(
+            f"{BASE_URL}/api/v1/platform/organization-requests/{req_id}/approve",
+            headers={"Authorization": f"Bearer {super_tok}"}
+        )
+        assert approve_res.status_code == 200
+        assert approve_res.json()["status"] == "approved"
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Super Admin Approved Onboarding Request")
+
+        # 4. Newly provisioned Company Admin logs in successfully
+        new_admin_login = await client.post(
+            f"{BASE_URL}/api/v1/auth/login",
+            json={"email": f"applicant.{unique_suffix}@dockercorp.uz", "password": "ApplicantPass2026!"}
+        )
+        assert new_admin_login.status_code == 200
+        assert "company_admin" in new_admin_login.json()["roles"]
+        assertion_count += 1
+        print(f"  [PASS Assertion {assertion_count}] Provisioned Company Admin Logged In Successfully")
+
     print("\n" + "=" * 70)
     print(f"SUMMARY: {scenario_count}/{scenario_count} SCENARIOS PASSED WITH {assertion_count}/{assertion_count} VERIFIED ASSERTIONS")
     print("=" * 70)

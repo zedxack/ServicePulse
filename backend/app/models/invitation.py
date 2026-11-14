@@ -59,8 +59,8 @@ class OrganizationInvitation(Base, TimestampMixin):
     invited_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Relationships
-    organization: Mapped["Organization"] = relationship("Organization")
-    role: Mapped["Role"] = relationship("Role")
+    organization: Mapped["Organization"] = relationship("Organization", lazy="selectin")
+    role: Mapped["Role"] = relationship("Role", lazy="selectin")
     created_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by_id])
     revoked_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[revoked_by_id])
 

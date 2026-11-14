@@ -424,3 +424,132 @@ async def test_reject_organization_request(client: AsyncClient, test_db: AsyncSe
     rej_data = reject_resp.json()
     assert rej_data["status"] == "rejected"
     assert rej_data["rejection_reason"] == "Invalid business credentials provided."
+
+
+@pytest.mark.asyncio
+async def test_rate_limiting_enforced(client: AsyncClient):
+    """Scenario 14: Rate limiter enforces limit and returns HTTP 429 with Retry-After header."""
+    auth_rate_limiter.requests_per_minute = 3
+    auth_rate_limiter._records.clear()
+
+    # First 3 attempts proceed normally (fail with 401 on bad password)
+    for _ in range(3):
+        r = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "attacker@servicepulse.uz", "password": "WrongPassword!"},
+            headers={"X-Real-IP": "203.0.113.195"}
+        )
+        assert r.status_code == 401
+
+    # 4th attempt is rate-limited
+    r_limited = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "attacker@servicepulse.uz", "password": "WrongPassword!"},
+        headers={"X-Real-IP": "203.0.113.195"}
+    )
+    assert r_limited.status_code == 429
+    assert "Retry-After" in r_limited.headers
+    assert "Rate limit exceeded" in r_limited.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_reverse_proxy_header_spoofing_prevented(client: AsyncClient):
+    """Scenario 15: Client cannot evade rate limiting by forging X-Forwarded-For prefixes."""
+    from starlette.requests import Request
+
+    from backend.app.core.rate_limiter import get_client_ip
+
+    # Simulating request passing through trusted reverse proxy where client sent forged header
+    scope = {
+        "type": "http",
+        "headers": [
+            (b"x-real-ip", b"198.51.100.42"),
+            (b"x-forwarded-for", b"1.2.3.4, 198.51.100.42"),
+        ],
+        "client": ("172.20.0.5", 50000),
+    }
+    req = Request(scope)
+    extracted_ip = get_client_ip(req)
+    # Must use trusted X-Real-IP rather than spoofed 1.2.3.4
+    assert extracted_ip == "198.51.100.42"
+
+
+@pytest.mark.asyncio
+async def test_employee_cannot_issue_invitations(client: AsyncClient, test_db: AsyncSession):
+    """Scenario 16: Employee role is forbidden from generating invitations."""
+    emp_token = await get_token(client, settings.FIRST_EMPLOYEE_EMAIL, settings.FIRST_EMPLOYEE_PASSWORD)
+    emp_role = (await test_db.execute(select(Role).where(Role.name == "employee"))).scalar_one()
+
+    resp = await client.post(
+        "/api/v1/auth/invitations",
+        headers={"Authorization": f"Bearer {emp_token}"},
+        json={"role_id": emp_role.id, "max_uses": 1, "expires_in_days": 1}
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_employee_cannot_approve_organization_request(client: AsyncClient, test_db: AsyncSession):
+    """Scenario 17: Employee role is forbidden from approving organization onboarding requests."""
+    emp_token = await get_token(client, settings.FIRST_EMPLOYEE_EMAIL, settings.FIRST_EMPLOYEE_PASSWORD)
+
+    resp = await client.post(
+        "/api/v1/platform/organization-requests/1/approve",
+        headers={"Authorization": f"Bearer {emp_token}"}
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_duplicate_email_registration_blocked(client: AsyncClient, test_db: AsyncSession):
+    """Scenario 18: Redundant registration with an existing active user email is rejected at DB boundary."""
+    admin_token = await get_token(client, "company_admin@servicepulse.uz", "CompanyAdminPass2026!")
+    emp_role = (await test_db.execute(select(Role).where(Role.name == "employee"))).scalar_one()
+
+    # Generate invitation
+    create_resp = await client.post(
+        "/api/v1/auth/invitations",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"role_id": emp_role.id, "max_uses": 1, "expires_in_days": 2}
+    )
+    raw_token = create_resp.json()["raw_token"]
+
+    # Try to redeem using the seed employee email which already exists
+    join_resp = await client.post(
+        "/api/v1/auth/join-organization",
+        json={
+            "invitation_code": raw_token,
+            "full_name": "Duplicate User",
+            "email": settings.FIRST_EMPLOYEE_EMAIL,
+            "password": "ValidPassword2026!",
+        }
+    )
+    assert join_resp.status_code == 400
+    assert "already exists" in join_resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_password_hashes_never_returned_in_api(client: AsyncClient, test_db: AsyncSession):
+    """Scenario 19: Verify zero password hashes or cryptographic token secrets appear in JSON payloads."""
+    super_token = await get_token(client, settings.FIRST_SUPERUSER_EMAIL, settings.FIRST_SUPERUSER_PASSWORD)
+    super_h = {"Authorization": f"Bearer {super_token}"}
+
+    # Check /auth/me
+    me_resp = await client.get("/api/v1/auth/me", headers=super_h)
+    assert me_resp.status_code == 200
+    assert "password" not in me_resp.json()
+    assert "hashed_password" not in me_resp.json()
+
+    # Check /auth/users
+    users_resp = await client.get("/api/v1/auth/users", headers=super_h)
+    assert users_resp.status_code == 200
+    for u in users_resp.json():
+        assert "password" not in u
+        assert "hashed_password" not in u
+
+    # Check /platform/organization-requests
+    reqs_resp = await client.get("/api/v1/platform/organization-requests", headers=super_h)
+    assert reqs_resp.status_code == 200
+    for req in reqs_resp.json():
+        assert "password" not in req
+        assert "hashed_password" not in req

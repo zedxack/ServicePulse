@@ -58,6 +58,6 @@ class OrganizationRequest(Base, TimestampMixin):
     )
 
     # Relationships
-    reviewed_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[reviewed_by_id])
-    created_organization: Mapped[Optional["Organization"]] = relationship("Organization", foreign_keys=[created_organization_id])
-    created_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_user_id])
+    reviewed_by: Mapped[Optional["User"]] = relationship("User", foreign_keys=[reviewed_by_id], lazy="selectin")
+    created_organization: Mapped[Optional["Organization"]] = relationship("Organization", foreign_keys=[created_organization_id], lazy="selectin")
+    created_user: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_user_id], lazy="selectin")

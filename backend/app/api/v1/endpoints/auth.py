@@ -15,6 +15,7 @@ from backend.app.core.dependencies import (
 from backend.app.core.rate_limiter import (
     get_client_ip,
     rate_limit_auth,
+    rate_limit_invitation_create,
     rate_limit_registration,
 )
 from backend.app.db.session import get_db
@@ -112,7 +113,10 @@ async def create_organization_request(
     response_model=InvitationCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate time-limited invitation for the organization (Company Admin, Super Admin)",
-    dependencies=[Depends(require_roles("platform_super_admin", "company_admin"))],
+    dependencies=[
+        Depends(require_roles("platform_super_admin", "company_admin")),
+        Depends(rate_limit_invitation_create),
+    ],
 )
 async def create_invitation(
     data: InvitationCreate,

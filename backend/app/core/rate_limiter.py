@@ -55,19 +55,30 @@ class SlidingWindowRateLimiter:
             )
 
 
-# Global instances for auth and registration endpoints
+# Global instances for auth, registration, and invitation endpoints
 auth_rate_limiter = SlidingWindowRateLimiter(requests_per_minute=30, window_seconds=60)
 registration_rate_limiter = SlidingWindowRateLimiter(requests_per_minute=10, window_seconds=60)
+invitation_rate_limiter = SlidingWindowRateLimiter(requests_per_minute=20, window_seconds=60)
 
 
 def get_client_ip(request: Request) -> str:
-    """Extract client IP handling proxy headers."""
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip()
+    """
+    Extract client IP safely handling reverse proxy headers.
+    Prioritizes X-Real-IP (overwritten by trusted reverse proxies such as Nginx or Caddy with $remote_addr).
+    If X-Forwarded-For is present, uses the rightmost (most recent) proxy hop to prevent
+    an attacker from forging an arbitrary IP as the first comma-separated hop.
+    Falls back to direct socket client host when not behind a proxy.
+    """
     real_ip = request.headers.get("x-real-ip")
     if real_ip:
         return real_ip.strip()
+
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        hops = [h.strip() for h in forwarded_for.split(",") if h.strip()]
+        if hops:
+            return hops[-1]
+
     return request.client.host if request.client else "unknown"
 
 
@@ -81,3 +92,9 @@ def rate_limit_registration(request: Request) -> None:
     """FastAPI dependency for registration and organization request rate limiting."""
     client_ip = get_client_ip(request)
     registration_rate_limiter.check(f"reg:{client_ip}")
+
+
+def rate_limit_invitation_create(request: Request) -> None:
+    """FastAPI dependency for invitation creation rate limiting."""
+    client_ip = get_client_ip(request)
+    invitation_rate_limiter.check(f"inv_create:{client_ip}")
