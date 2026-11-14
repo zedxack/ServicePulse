@@ -23,6 +23,7 @@ from backend.app.schemas.incident import (
     IncidentCreate,
     IncidentResolve,
 )
+from backend.app.services.ws_manager import ws_manager
 
 
 class IncidentService:
@@ -135,6 +136,18 @@ class IncidentService:
                 details=f"Incident '{new_incident.title}' opened with severity {new_incident.severity}",
             ))
             await db.commit()
+            if target_org_id:
+                await ws_manager.broadcast_to_org(
+                    target_org_id,
+                    "incident:created",
+                    {
+                        "id": new_incident.id,
+                        "title": new_incident.title,
+                        "severity": new_incident.severity,
+                        "status": new_incident.status,
+                        "device_id": new_incident.device_id,
+                    },
+                )
             return await IncidentService.get_incident_by_id(new_incident.id, db)
 
         except IntegrityError:
@@ -247,6 +260,16 @@ class IncidentService:
         db.add(incident)
         db.add(event)
         await db.commit()
+        if incident.organization_id:
+            await ws_manager.broadcast_to_org(
+                incident.organization_id,
+                "incident:assigned",
+                {
+                    "id": incident.id,
+                    "status": incident.status,
+                    "assigned_to_user_id": incident.assigned_to_user_id,
+                },
+            )
         return await IncidentService.get_incident_by_id(inc_id, db)
 
     @staticmethod
@@ -272,6 +295,16 @@ class IncidentService:
         db.add(incident)
         db.add(event)
         await db.commit()
+        if incident.organization_id:
+            await ws_manager.broadcast_to_org(
+                incident.organization_id,
+                "incident:acknowledged",
+                {
+                    "id": incident.id,
+                    "status": incident.status,
+                    "notes": ack_in.notes,
+                },
+            )
         return await IncidentService.get_incident_by_id(inc_id, db)
 
     @staticmethod
@@ -312,4 +345,14 @@ class IncidentService:
             details=f"Incident {incident.id} marked as resolved. Deduplication key cleared.",
         ))
         await db.commit()
+        if incident.organization_id:
+            await ws_manager.broadcast_to_org(
+                incident.organization_id,
+                "incident:resolved",
+                {
+                    "id": incident.id,
+                    "status": "resolved",
+                    "resolution_notes": incident.resolution_notes,
+                },
+            )
         return await IncidentService.get_incident_by_id(inc_id, db)

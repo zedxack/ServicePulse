@@ -27,6 +27,7 @@ from backend.app.schemas.agent import (
     AgentTelemetryRequest,
     AgentTelemetryResponse,
 )
+from backend.app.services.ws_manager import ws_manager
 
 
 class AgentService:
@@ -195,6 +196,23 @@ class AgentService:
 
         await db.commit()
         await db.refresh(telemetry)
+
+        if agent.organization_id:
+            await ws_manager.broadcast_to_org(
+                agent.organization_id,
+                "device:telemetry",
+                {
+                    "agent_id": agent.id,
+                    "device_id": agent.device_id,
+                    "hostname": agent.hostname,
+                    "cpu_percent": tel_in.cpu_percent,
+                    "ram_percent": tel_in.ram_percent,
+                    "disk_percent": tel_in.disk_percent,
+                    "windows_activation_status": tel_in.windows_activation_status,
+                    "windows_defender_status": tel_in.windows_defender_status,
+                    "recorded_at": record_time.isoformat(),
+                },
+            )
 
         return AgentTelemetryResponse(
             status="recorded",

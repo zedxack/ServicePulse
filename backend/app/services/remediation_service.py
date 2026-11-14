@@ -19,6 +19,7 @@ from backend.app.models.inventory import Device
 from backend.app.models.remediation import RemediationExecution, RemediationRule
 from backend.app.models.user import User
 from backend.app.services.remediation_policy import RemediationPolicy
+from backend.app.services.ws_manager import ws_manager
 
 
 class RemediationService:
@@ -177,6 +178,18 @@ class RemediationService:
             created_by_user_id=actor.id if actor else None,
             created_at=now,
         ))
+        if incident.organization_id:
+            await ws_manager.broadcast_to_org(
+                incident.organization_id,
+                "remediation:status",
+                {
+                    "execution_id": exc.id,
+                    "incident_id": incident.id,
+                    "rule_id": rule.id,
+                    "action_name": rule.action_name,
+                    "status": exc.status,
+                },
+            )
         return exc
 
     @staticmethod
@@ -243,8 +256,26 @@ class RemediationService:
                 created_at=now,
             ))
 
+        target_org_id = exc.incident.organization_id if exc.incident else None
+        rule_id = exc.rule_id
+        action_name = exc.rule.action_name if exc.rule else None
+        execution_id = exc.id
+        incident_id = exc.incident_id
+
         await db.commit()
         await db.refresh(exc)
+        if target_org_id:
+            await ws_manager.broadcast_to_org(
+                target_org_id,
+                "remediation:status",
+                {
+                    "execution_id": execution_id,
+                    "incident_id": incident_id,
+                    "rule_id": rule_id,
+                    "action_name": action_name,
+                    "status": exc.status,
+                },
+            )
         return exc
 
     @staticmethod
@@ -257,7 +288,10 @@ class RemediationService:
         """Reject a pending remediation execution."""
         q = (
             select(RemediationExecution)
-            .options(selectinload(RemediationExecution.rule))
+            .options(
+                selectinload(RemediationExecution.rule),
+                selectinload(RemediationExecution.incident),
+            )
             .where(RemediationExecution.id == execution_id)
         )
         exc = (await db.execute(q)).scalar_one_or_none()
@@ -281,6 +315,24 @@ class RemediationService:
                 created_at=now,
             ))
 
+        target_org_id = exc.incident.organization_id if exc.incident else None
+        rule_id = exc.rule_id
+        action_name = exc.rule.action_name if exc.rule else None
+        execution_id = exc.id
+        incident_id = exc.incident_id
+
         await db.commit()
         await db.refresh(exc)
+        if target_org_id:
+            await ws_manager.broadcast_to_org(
+                target_org_id,
+                "remediation:status",
+                {
+                    "execution_id": execution_id,
+                    "incident_id": incident_id,
+                    "rule_id": rule_id,
+                    "action_name": action_name,
+                    "status": exc.status,
+                },
+            )
         return exc

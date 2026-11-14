@@ -3,6 +3,7 @@ ServicePulse - Enterprise RMM & ITSM Platform Backend
 Author: Muhammadyusuf Usmonov
 Academic Purpose: AT-Servis BMI
 """
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
@@ -15,13 +16,14 @@ from backend.app.core.logging import logger
 from backend.app.db.base import Base
 from backend.app.db.init_db import init_db
 from backend.app.db.session import AsyncSessionLocal, engine
+from backend.app.services.ws_manager import ws_manager
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    Initializes database tables and default seed data on startup.
+    Initializes database tables, default seed data, and real-time outbox listener.
     """
     logger.info("Starting ServicePulse Backend v%s in %s mode...", settings.VERSION, settings.ENVIRONMENT)
     try:
@@ -33,9 +35,19 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error("Database startup initialization encountered an issue: %s", exc, exc_info=True)
 
+    outbox_task = asyncio.create_task(ws_manager.start_outbox_listener())
+
     yield
 
-    logger.info("Shutting down ServicePulse Backend. Disposing database engine...")
+    logger.info("Shutting down ServicePulse Backend...")
+    ws_manager.stop_outbox_listener()
+    outbox_task.cancel()
+    try:
+        await outbox_task
+    except asyncio.CancelledError:
+        pass
+
+    logger.info("Disposing database engine...")
     await engine.dispose()
     logger.info("ServicePulse Backend shutdown complete.")
 

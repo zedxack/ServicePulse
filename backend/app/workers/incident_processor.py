@@ -21,7 +21,11 @@ from backend.app.models.monitoring import (
 from backend.app.models.network import NetworkCheck
 from backend.app.schemas.incident import IncidentCreate
 from backend.app.schemas.monitoring import ProbeResult
+from backend.app.schemas.notification import NotificationCreate
+from backend.app.services.event_outbox_service import EventOutboxService
 from backend.app.services.incident_service import IncidentService
+from backend.app.services.notification_service import NotificationService
+from backend.app.services.ws_manager import ws_manager
 
 
 class NetworkIncidentProcessor:
@@ -95,6 +99,41 @@ class NetworkIncidentProcessor:
                     )
                     db.add(outage)
                     await db.flush()
+
+                    if device.organization_id:
+                        await EventOutboxService.record_worker_event(
+                            db=db,
+                            organization_id=device.organization_id,
+                            event_type="device:status_change",
+                            data={
+                                "device_id": device.id,
+                                "device_name": device.name,
+                                "old_status": old_status,
+                                "new_status": "offline",
+                            },
+                        )
+                        await ws_manager.broadcast_to_org(
+                            device.organization_id,
+                            "device:status_change",
+                            {
+                                "device_id": device.id,
+                                "device_name": device.name,
+                                "old_status": old_status,
+                                "new_status": "offline",
+                            },
+                        )
+                        await NotificationService.create_notification(
+                            db=db,
+                            notif_in=NotificationCreate(
+                                organization_id=device.organization_id,
+                                title=f"Device Offline: {device.name}",
+                                message=f"Device '{device.name}' ({device.ip_address}) failed {device.consecutive_failures} consecutive probes.",
+                                severity="error",
+                                category="device",
+                                fingerprint=f"dev_offline_notif:{device.id}",
+                                data={"device_id": device.id, "ip_address": device.ip_address},
+                            ),
+                        )
 
                 # Create or Deduplicate Incident
                 inc_title = f"Device unreachable: {device.name} ({device.ip_address})"
@@ -209,6 +248,61 @@ class NetworkIncidentProcessor:
                                 created_at=now,
                             )
                             db.add(resolved_event)
+                            if device.organization_id:
+                                await EventOutboxService.record_worker_event(
+                                    db=db,
+                                    organization_id=device.organization_id,
+                                    event_type="incident:resolved",
+                                    data={
+                                        "id": active_inc.id,
+                                        "status": "resolved",
+                                        "resolution_notes": active_inc.resolution_notes,
+                                    },
+                                )
+                                await ws_manager.broadcast_to_org(
+                                    device.organization_id,
+                                    "incident:resolved",
+                                    {
+                                        "id": active_inc.id,
+                                        "status": "resolved",
+                                        "resolution_notes": active_inc.resolution_notes,
+                                    },
+                                )
+
+                    if device.organization_id:
+                        await EventOutboxService.record_worker_event(
+                            db=db,
+                            organization_id=device.organization_id,
+                            event_type="device:status_change",
+                            data={
+                                "device_id": device.id,
+                                "device_name": device.name,
+                                "old_status": old_status,
+                                "new_status": "online",
+                            },
+                        )
+                        await ws_manager.broadcast_to_org(
+                            device.organization_id,
+                            "device:status_change",
+                            {
+                                "device_id": device.id,
+                                "device_name": device.name,
+                                "old_status": old_status,
+                                "new_status": "online",
+                            },
+                        )
+                        await NotificationService.create_notification(
+                            db=db,
+                            notif_in=NotificationCreate(
+                                organization_id=device.organization_id,
+                                title=f"Device Recovered: {device.name}",
+                                message=f"Device '{device.name}' connectivity has been restored.",
+                                severity="info",
+                                category="device",
+                                fingerprint=f"dev_recovered_notif:{device.id}:{int(now.timestamp())}",
+                                data={"device_id": device.id},
+                            ),
+                        )
 
             device.consecutive_failures = 0
             device.last_seen = now

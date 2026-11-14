@@ -6,6 +6,7 @@ Author: Muhammadyusuf Usmonov
 from backend.app.db.base import Base, TimestampMixin
 from backend.app.models.agent import Agent, AgentCommand, AgentTelemetry
 from backend.app.models.audit import AuditLog
+from backend.app.models.event_outbox import RealtimeEvent
 from backend.app.models.incident import Incident, IncidentEvent
 from backend.app.models.inventory import Building, Device, Floor, Room
 from backend.app.models.monitoring import (
@@ -15,6 +16,7 @@ from backend.app.models.monitoring import (
     OutageInterval,
 )
 from backend.app.models.network import NetworkCheck
+from backend.app.models.notification import Notification
 from backend.app.models.organization import Organization
 from backend.app.models.remediation import RemediationExecution, RemediationRule
 from backend.app.models.ticket import SoftwareRequest, Ticket, TicketComment
@@ -51,6 +53,8 @@ __all__ = [
     "Incident",
     "IncidentEvent",
     "NetworkCheck",
+    "Notification",
+    "RealtimeEvent",
     "RemediationRule",
     "RemediationExecution",
     "Ticket",

@@ -14,6 +14,9 @@ import { IncidentDetailPage } from '../../features/incidents/IncidentDetailPage'
 import { HelpdeskPage } from '../../features/tickets/HelpdeskPage';
 import { TicketDetailPage } from '../../features/tickets/TicketDetailPage';
 import { SoftwarePage } from '../../features/software/SoftwarePage';
+import { LiveMonitoringPage } from '../../features/monitoring/LiveMonitoringPage';
+import { AnalyticsPage } from '../../features/analytics/AnalyticsPage';
+import { AlertCenterPage } from '../../features/alerts/AlertCenterPage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAuth } from '../../features/auth/AuthContext';
@@ -104,6 +107,18 @@ export const router = createBrowserRouter([
       {
         path: 'software',
         element: <SoftwarePage />,
+      },
+      {
+        path: 'monitoring/live',
+        element: <LiveMonitoringPage />,
+      },
+      {
+        path: 'analytics',
+        element: <AnalyticsPage />,
+      },
+      {
+        path: 'alerts',
+        element: <AlertCenterPage />,
       },
     ],
   },

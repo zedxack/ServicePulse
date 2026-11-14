@@ -3,6 +3,8 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
+  BarChart3,
+  Bell,
   Building2,
   ChevronRight,
   HardDrive,
@@ -12,19 +14,34 @@ import {
   Menu,
   Package,
   PieChart,
+  Radio,
   Server,
   ShieldAlert,
   User as UserIcon,
   X,
 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../features/auth/AuthContext';
 import { LanguageSwitcher } from '../../shared/components/LanguageSwitcher';
+import { getUnreadAlertCount } from '../../shared/api/alerts';
+import { useRealtimeMonitoring } from '../../features/monitoring/useRealtimeMonitoring';
 
 export const AppLayout: React.FC = () => {
   const { t } = useTranslation();
   const { user, logout, hasAnyRole } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Maintain real-time WebSocket connection across layout
+  useRealtimeMonitoring(Boolean(user));
+
+  const { data: unreadData } = useQuery({
+    queryKey: ['unread-alerts-count'],
+    queryFn: getUnreadAlertCount,
+    refetchInterval: 30000,
+    enabled: Boolean(user),
+  });
+  const unreadCount = unreadData?.unread_count ?? 0;
 
   const handleLogout = async () => {
     await logout();
@@ -93,6 +110,28 @@ export const AppLayout: React.FC = () => {
       label: t('nav.software'),
       icon: Package,
       visible: true,
+    },
+  ];
+
+  const monitoringItems = [
+    {
+      to: '/monitoring/live',
+      label: t('nav.liveMonitoring', 'Live Monitoring'),
+      icon: Radio,
+      visible: hasAnyRole(['it_admin', 'support', 'admin', 'company_admin', 'platform_super_admin']),
+    },
+    {
+      to: '/analytics',
+      label: t('nav.analyticsSLA', 'Analytics & SLA'),
+      icon: BarChart3,
+      visible: hasAnyRole(['executive', 'it_admin', 'admin', 'company_admin', 'platform_super_admin']),
+    },
+    {
+      to: '/alerts',
+      label: t('nav.alerts', 'Alert Center'),
+      icon: Bell,
+      visible: true,
+      badgeCount: unreadCount,
     },
   ];
 
@@ -175,6 +214,42 @@ export const AppLayout: React.FC = () => {
                         <Icon className="h-4 w-4 shrink-0" />
                         <span>{item.label}</span>
                       </div>
+                    </NavLink>
+                  );
+                })}
+            </nav>
+          </div>
+
+          <div>
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+              Monitoring & Analytics
+            </div>
+            <nav className="space-y-1">
+              {monitoringItems
+                .filter((item) => item.visible)
+                .map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                          isActive
+                            ? 'bg-brand-50 text-brand-700 shadow-xs'
+                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                      {Boolean(item.badgeCount && item.badgeCount > 0) && (
+                        <span className="rounded-full bg-red-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                          {item.badgeCount}
+                        </span>
+                      )}
                     </NavLink>
                   );
                 })}
@@ -280,6 +355,43 @@ export const AppLayout: React.FC = () => {
                     })}
                 </nav>
               </div>
+
+              <div>
+                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+                  Monitoring & Analytics
+                </div>
+                <nav className="space-y-1">
+                  {monitoringItems
+                    .filter((item) => item.visible)
+                    .map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold ${
+                              isActive
+                                ? 'bg-brand-50 text-brand-700'
+                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            }`
+                          }
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon className="h-4 w-4" />
+                            <span>{item.label}</span>
+                          </div>
+                          {Boolean(item.badgeCount && item.badgeCount > 0) && (
+                            <span className="rounded-full bg-red-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                              {item.badgeCount}
+                            </span>
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                </nav>
+              </div>
             </div>
             <div className="border-t border-surface-200 p-4">
               <button
@@ -322,6 +434,18 @@ export const AppLayout: React.FC = () => {
                 <span>Org #{user.organization_id}</span>
               </div>
             )}
+            <button
+              onClick={() => navigate('/alerts')}
+              className="relative p-2 rounded-lg text-surface-600 hover:bg-surface-100 hover:text-surface-900 transition"
+              title={t('nav.alerts', 'Alert Center')}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
+            </button>
             <LanguageSwitcher />
           </div>
         </header>
