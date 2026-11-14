@@ -10,39 +10,77 @@ services:
   caddy:
     image: caddy:2.8-alpine
     container_name: servicepulse-caddy
-    restart: always
+    restart: unless-stopped
     ports:
+      # Only Caddy publishes public host ports
       - "80:80"
       - "443:443"
       - "443:443/udp"
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME:-servicepulse.uz}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@servicepulse.uz}
     volumes:
       - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
     networks:
       - servicepulse-prod-net
 
   db:
     image: postgres:16-alpine
     container_name: servicepulse-prod-db
-    restart: always
+    restart: unless-stopped
+    # Database is strictly private to the internal container network (no host port publishing)
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-servicepulse}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_USER: ${POSTGRES_USER:-servicepulse_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Database password required}
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-servicepulse}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-servicepulse_admin} -d ${POSTGRES_DB:-servicepulse}"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     networks:
       - servicepulse-prod-net
 
@@ -51,26 +89,94 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: servicepulse-prod-backend
-    restart: always
+    restart: unless-stopped
+    # Backend is strictly private to the internal container network (no host port publishing)
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-servicepulse}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-servicepulse_admin}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-servicepulse}
       ENVIRONMENT: production
       DEBUG: "false"
       SECRET_KEY: ${SECRET_KEY:?Production SECRET_KEY required}
       BACKEND_CORS_ORIGINS: "https://${DOMAIN_NAME:-servicepulse.uz}"
       AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?Enrollment secret required}
+      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL:-admin@servicepulse.uz}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-}
+      FIRST_SUPPORT_EMAIL: ${FIRST_SUPPORT_EMAIL:-support@servicepulse.uz}
+      FIRST_SUPPORT_PASSWORD: ${FIRST_SUPPORT_PASSWORD:-}
+      FIRST_EMPLOYEE_EMAIL: ${FIRST_EMPLOYEE_EMAIL:-employee@servicepulse.uz}
+      FIRST_EMPLOYEE_PASSWORD: ${FIRST_EMPLOYEE_PASSWORD:-}
+      WORKER_SIMULATION_MODE: "false"
     depends_on:
       db:
         condition: service_healthy
     command: >
       sh -c "alembic -c backend/alembic.ini upgrade head &&
              python -m backend.app.db.init_db &&
-             uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4"
+             uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 1"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    networks:
+      - servicepulse-prod-net
+
+  network-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: servicepulse-prod-network-worker
+    restart: unless-stopped
+    # Worker runs as background daemon without exposing network ports
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-servicepulse_admin}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-servicepulse}
+      ENVIRONMENT: production
+      DEBUG: "false"
+      SECRET_KEY: ${SECRET_KEY:?Production SECRET_KEY required}
+      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?Enrollment secret required}
+      MONITORING_INTERVAL_SECONDS: ${MONITORING_INTERVAL_SECONDS:-30}
+      MONITORING_CONCURRENCY_LIMIT: ${MONITORING_CONCURRENCY_LIMIT:-10}
+      CONSECUTIVE_FAILURE_THRESHOLD: ${CONSECUTIVE_FAILURE_THRESHOLD:-3}
+      ICMP_ENABLED: ${ICMP_ENABLED:-true}
+      WORKER_SIMULATION_MODE: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: python -m backend.app.workers.network_worker
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
     networks:
       - servicepulse-prod-net
 
@@ -79,18 +185,44 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     container_name: servicepulse-prod-frontend
-    restart: always
+    restart: unless-stopped
+    # Frontend is strictly private to the internal container network (accessed via Caddy)
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
     networks:
       - servicepulse-prod-net
 
 volumes:
   pgdata_prod:
+    name: servicepulse-prod-pgdata
   caddy_data:
+    name: servicepulse-prod-caddy-data
   caddy_config:
+    name: servicepulse-prod-caddy-config
   caddy_logs:
+    name: servicepulse-prod-caddy-logs
 
 networks:
   servicepulse-prod-net:
+    name: servicepulse-prod-net
     driver: bridge

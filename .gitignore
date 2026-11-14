@@ -1,8 +1,19 @@
 # Environments & Secrets
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!infra/env/.env.production.template
+
+# Backups & Database Dumps
+backups/
+*.sql.gz
+*.sql.gz.sha256
+*.meta.json
+*.dump
+*.backup
+*.key
+*.pem
+*.crt
 
 # Python
 __pycache__/
@@ -10,10 +21,11 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
-venv/
+/env/
+/venv/
 .venv/
-ENV/
+/ENV/
+!infra/env/**
 build/
 develop-eggs/
 dist/
