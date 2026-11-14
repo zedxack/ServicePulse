@@ -330,9 +330,12 @@ class AgentService:
         if not cmd or cmd.agent_id != agent.id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found for this agent")
 
+        from backend.app.core.security import redact_sensitive_text
+
         now = datetime.now(timezone.utc)
+        sanitized_result = redact_sensitive_text(result_in.execution_result)
         cmd.status = result_in.status
-        cmd.execution_result = result_in.execution_result
+        cmd.execution_result = sanitized_result
         cmd.executed_at = result_in.executed_at or now
         db.add(cmd)
 
@@ -345,8 +348,8 @@ class AgentService:
             ex = (await db.execute(q_ex)).scalar_one_or_none()
             if ex:
                 ex.status = result_in.status
-                if result_in.execution_result:
-                    ex.execution_log = f"{ex.execution_log or ''}\nAgent Result: {result_in.execution_result}".strip()
+                if sanitized_result:
+                    ex.execution_log = f"{ex.execution_log or ''}\nAgent Result: {sanitized_result}".strip()
                 db.add(ex)
                 await db.flush()
                 if result_in.status == "succeeded":

@@ -4,7 +4,7 @@ Rules, execution tracking, approval workflows, and verification.
 Multi-tenant isolation and strict action allowlisting enforced.
 Author: Muhammadyusuf Usmonov
 """
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -202,6 +202,7 @@ async def create_remediation_execution(
 async def list_remediation_executions(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
+    incident_id: Optional[int] = Query(None, description="Filter by incident ID"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db)
 ) -> List[RemediationExecution]:
@@ -215,6 +216,8 @@ async def list_remediation_executions(
     )
     if scoped_org_id is not None:
         q = q.where(Incident.organization_id == scoped_org_id)
+    if incident_id is not None:
+        q = q.where(RemediationExecution.incident_id == incident_id)
     result = await db.execute(q)
     return list(result.scalars().all())
 

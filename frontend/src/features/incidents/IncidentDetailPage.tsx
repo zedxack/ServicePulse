@@ -12,6 +12,7 @@ import {
   History,
   Info,
   RefreshCw,
+  Shield,
   UserCheck,
   Wrench,
 } from 'lucide-react';
@@ -52,11 +53,11 @@ export const IncidentDetailPage: React.FC = () => {
 
   const { data: remediations } = useQuery({
     queryKey: ['incidentRemediations', id],
-    queryFn: () => incidentsApi.listRemediationExecutions({ limit: 50 }),
+    queryFn: () => incidentsApi.listRemediationExecutions({ incident_id: id, limit: 50 }),
     enabled: !!id && canRespond,
   });
 
-  const relatedRemediations = (remediations || []).filter((r) => r.incident_id === id);
+  const relatedRemediations = remediations || [];
 
   const ackMutation = useMutation({
     mutationFn: () => incidentsApi.acknowledgeIncident(id, { notes: 'Acknowledged via UI' }),
@@ -349,27 +350,45 @@ export const IncidentDetailPage: React.FC = () => {
             <h3 className="text-sm font-bold text-surface-900">{t('incidents.remediations')}</h3>
           </div>
 
-          {relatedRemediations.length === 0 ? (
+          {!canRespond ? (
+            <div className="py-8 text-center text-xs text-surface-500">
+              <Shield className="mx-auto h-6 w-6 text-surface-400 mb-2" />
+              <p className="font-semibold text-surface-700">Tuzatish tafsilotlari cheklangan</p>
+              <p className="mt-1 text-[11px] text-surface-400">
+                Avtomatik tuzatish auditi faqat vakolatli IT xodimlari uchun ko'rsatiladi.
+              </p>
+            </div>
+          ) : relatedRemediations.length === 0 ? (
             <div className="py-8 text-center text-xs text-surface-500">
               {t('incidents.noRemediations')}
             </div>
           ) : (
             <div className="divide-y divide-surface-100">
-              {relatedRemediations.map((rem) => (
-                <div key={rem.id} className="py-3 text-xs space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-surface-900">Execution #{rem.id}</span>
-                    <span className="rounded bg-surface-100 px-2 py-0.5 text-[10px] font-semibold capitalize text-surface-700">
-                      {rem.status}
-                    </span>
+              {relatedRemediations.map((rem) => {
+                const isSuccess = rem.status === 'succeeded';
+                const isFailed = rem.status === 'failed';
+                const statusBadgeClass = isSuccess
+                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                  : isFailed
+                  ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200'
+                  : 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+
+                return (
+                  <div key={rem.id} className="py-3 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-surface-900">Execution #{rem.id}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${statusBadgeClass}`}>
+                        {rem.status}
+                      </span>
+                    </div>
+                    <p className="text-surface-600 text-[11px] font-mono break-all">{rem.execution_log || 'No log details'}</p>
+                    <div className="flex items-center justify-between text-[10px] text-surface-400 pt-1">
+                      <span>Verification: <b className="capitalize text-surface-700">{rem.verification_status}</b></span>
+                      <span>{new Date(rem.created_at).toLocaleString()}</span>
+                    </div>
                   </div>
-                  <p className="text-surface-600 text-[11px]">{rem.execution_log || 'No log details'}</p>
-                  <div className="flex items-center justify-between text-[10px] text-surface-400 pt-1">
-                    <span>Verification: <b className="capitalize text-surface-700">{rem.verification_status}</b></span>
-                    <span>{new Date(rem.created_at).toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

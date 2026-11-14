@@ -3,6 +3,7 @@ ServicePulse - Security and Authentication Module
 Argon2id password hashing & PyJWT token handling
 Author: Muhammadyusuf Usmonov
 """
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
@@ -101,3 +102,31 @@ def decode_token(token: str) -> Dict[str, Any]:
         return decoded
     except jwt.PyJWTError as exc:
         raise ValueError(f"Invalid token: {str(exc)}") from exc
+
+
+SENSITIVE_PATTERNS = [
+    # Bearer tokens
+    (re.compile(r"(Bearer\s+)[A-Za-z0-9\-._~+/]+=*", re.IGNORECASE), r"\1[REDACTED]"),
+    # Authorization header
+    (re.compile(r"(?i)(authorization:\s*)[^\r\n]+"), r"\1[REDACTED]"),
+    # Passwords and secrets in key-value format
+    (
+        re.compile(
+            r"(?i)\b(password|secret|token|api[_-]?key|enrollment_secret|client_secret)\b(\s*[:=]\s*['\"]?)[^\s'\",;]+(['\"]?)"
+        ),
+        r"\1\2[REDACTED]\3",
+    ),
+    # Long base64/hex blobs (64+ chars)
+    (re.compile(r"\b[A-Za-z0-9+/]{64,}={0,2}\b"), "[REDACTED_BLOB]"),
+]
+
+
+def redact_sensitive_text(text: Optional[str]) -> Optional[str]:
+    """Redact sensitive credentials, tokens, secrets and authorization headers from text."""
+    if not text:
+        return text
+    redacted = text
+    for pattern, replacement in SENSITIVE_PATTERNS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+

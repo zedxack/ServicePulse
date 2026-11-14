@@ -61,6 +61,7 @@ export const incidentsApi = {
   listRemediationExecutions: async (params?: {
     skip?: number;
     limit?: number;
+    incident_id?: number;
   }): Promise<RemediationExecutionRead[]> => {
     const response = await apiClient.get<RemediationExecutionRead[]>('/remediations/executions', {
       params,
