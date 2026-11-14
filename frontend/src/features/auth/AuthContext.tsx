@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authApi } from '../../shared/api/auth';
+import { clearAuthToken, setAuthToken } from '../../shared/api/client';
 import { LoginCredentials, User } from '../../shared/types/auth';
 
 interface AuthContextType {
@@ -16,55 +17,21 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('servicepulse_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem('servicepulse_token');
-  });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Purely in-memory authentication state (never stored in localStorage or sessionStorage)
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Validate and load fresh user profile on startup if token exists
   useEffect(() => {
-    let isMounted = true;
-
-    const initAuth = async () => {
-      const storedToken = localStorage.getItem('servicepulse_token');
-      if (storedToken) {
-        try {
-          const profile = await authApi.getMe();
-          if (isMounted) {
-            setUser(profile);
-            localStorage.setItem('servicepulse_user', JSON.stringify(profile));
-          }
-        } catch {
-          if (isMounted) {
-            setUser(null);
-            setToken(null);
-            localStorage.removeItem('servicepulse_token');
-            localStorage.removeItem('servicepulse_user');
-          }
-        }
-      }
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    };
-
-    initAuth();
-
-    // Listen to global 401 unauthorized event
+    // Listen to global 401 unauthorized event (triggered by Axios response interceptor)
     const handleUnauthorized = () => {
+      clearAuthToken();
       setUser(null);
       setToken(null);
-      localStorage.removeItem('servicepulse_token');
-      localStorage.removeItem('servicepulse_user');
     };
 
     window.addEventListener('servicepulse_unauthorized', handleUnauthorized);
     return () => {
-      isMounted = false;
       window.removeEventListener('servicepulse_unauthorized', handleUnauthorized);
     };
   }, []);
@@ -73,12 +40,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const tokenResp = await authApi.login(credentials);
-      localStorage.setItem('servicepulse_token', tokenResp.access_token);
+      // Store access token in-memory only
+      setAuthToken(tokenResp.access_token);
       setToken(tokenResp.access_token);
 
       // Fetch authoritative user profile with roles and permissions
       const profile = await authApi.getMe();
-      localStorage.setItem('servicepulse_user', JSON.stringify(profile));
       setUser(profile);
       return profile;
     } finally {
@@ -89,9 +56,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await authApi.logout();
+    } catch {
+      // Ignore network errors during logout
     } finally {
-      localStorage.removeItem('servicepulse_token');
-      localStorage.removeItem('servicepulse_user');
+      clearAuthToken();
       setUser(null);
       setToken(null);
     }

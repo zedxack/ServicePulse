@@ -3,6 +3,7 @@ import { render, screen, act } from '@testing-library/react';
 import React from 'react';
 import { AuthProvider, useAuth } from '../features/auth/AuthContext';
 import { authApi } from '../shared/api/auth';
+import { getAuthToken } from '../shared/api/client';
 import { User, TokenResponse } from '../shared/types/auth';
 
 vi.mock('../shared/api/auth', () => ({
@@ -26,8 +27,8 @@ const mockUser: User = {
 };
 
 const mockTokenResponse: TokenResponse = {
-  access_token: 'mock-access-token',
-  refresh_token: 'mock-refresh-token',
+  access_token: 'mock-jwt-access-token-xyz',
+  refresh_token: 'mock-jwt-refresh-token-xyz',
   token_type: 'bearer',
   expires_in: 3600,
   primary_dashboard: 'platform',
@@ -45,7 +46,7 @@ const TestConsumer: React.FC = () => {
       <div data-testid="has-role">{hasRole('platform_super_admin') ? 'yes' : 'no'}</div>
       <div data-testid="has-any-role">{hasAnyRole(['platform_super_admin', 'company_admin']) ? 'yes' : 'no'}</div>
       <button
-        onClick={() => login({ email: 'admin@servicepulse.uz', password: 'AdminPass2026!' })}
+        onClick={() => login({ email: 'admin@servicepulse.uz', password: 'ValidTestPassword123!' })}
         data-testid="login-btn"
       >
         Login
@@ -57,13 +58,13 @@ const TestConsumer: React.FC = () => {
   );
 };
 
-describe('AuthContext and Authentication Lifecycle', () => {
+describe('AuthContext and In-Memory JWT Security', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
   });
 
-  it('initializes in unauthenticated state when storage is empty', async () => {
+  it('initializes in unauthenticated state without reading tokens from storage', async () => {
     render(
       <AuthProvider>
         <TestConsumer />
@@ -72,9 +73,10 @@ describe('AuthContext and Authentication Lifecycle', () => {
 
     expect(screen.getByTestId('auth-status').textContent).toBe('unauthenticated');
     expect(screen.getByTestId('user-email').textContent).toBe('none');
+    expect(getAuthToken()).toBeNull();
   });
 
-  it('authenticates user and loads user profile on successful login', async () => {
+  it('stores access token strictly in-memory and NEVER writes to localStorage or sessionStorage', async () => {
     vi.mocked(authApi.login).mockResolvedValueOnce(mockTokenResponse);
     vi.mocked(authApi.getMe).mockResolvedValueOnce(mockUser);
 
@@ -90,19 +92,25 @@ describe('AuthContext and Authentication Lifecycle', () => {
 
     expect(authApi.login).toHaveBeenCalledWith({
       email: 'admin@servicepulse.uz',
-      password: 'AdminPass2026!',
+      password: 'ValidTestPassword123!',
     });
     expect(authApi.getMe).toHaveBeenCalled();
-    expect(localStorage.getItem('servicepulse_token')).toBe('mock-access-token');
+
+    // Verify token is in memory
+    expect(getAuthToken()).toBe('mock-jwt-access-token-xyz');
+
+    // CRITICAL SECURITY ASSERTION: Zero tokens in browser storage
+    expect(localStorage.getItem('servicepulse_token')).toBeNull();
+    expect(localStorage.getItem('servicepulse_user')).toBeNull();
+
     expect(screen.getByTestId('auth-status').textContent).toBe('authenticated');
     expect(screen.getByTestId('user-email').textContent).toBe('admin@servicepulse.uz');
     expect(screen.getByTestId('has-role').textContent).toBe('yes');
     expect(screen.getByTestId('has-any-role').textContent).toBe('yes');
   });
 
-  it('clears credentials from storage and state on logout', async () => {
-    localStorage.setItem('servicepulse_token', 'stored-token');
-    localStorage.setItem('servicepulse_user', JSON.stringify(mockUser));
+  it('clears in-memory credentials and resets state on logout', async () => {
+    vi.mocked(authApi.login).mockResolvedValueOnce(mockTokenResponse);
     vi.mocked(authApi.getMe).mockResolvedValueOnce(mockUser);
     vi.mocked(authApi.logout).mockResolvedValueOnce();
 
@@ -113,12 +121,41 @@ describe('AuthContext and Authentication Lifecycle', () => {
     );
 
     await act(async () => {
+      screen.getByTestId('login-btn').click();
+    });
+    expect(getAuthToken()).toBe('mock-jwt-access-token-xyz');
+
+    await act(async () => {
       screen.getByTestId('logout-btn').click();
     });
 
     expect(authApi.logout).toHaveBeenCalled();
-    expect(localStorage.getItem('servicepulse_token')).toBeNull();
-    expect(localStorage.getItem('servicepulse_user')).toBeNull();
+    expect(getAuthToken()).toBeNull();
+    expect(screen.getByTestId('auth-status').textContent).toBe('unauthenticated');
+    expect(screen.getByTestId('user-email').textContent).toBe('none');
+  });
+
+  it('resets in-memory authentication state on 401 unauthorized event', async () => {
+    vi.mocked(authApi.login).mockResolvedValueOnce(mockTokenResponse);
+    vi.mocked(authApi.getMe).mockResolvedValueOnce(mockUser);
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await act(async () => {
+      screen.getByTestId('login-btn').click();
+    });
+    expect(screen.getByTestId('auth-status').textContent).toBe('authenticated');
+
+    // Trigger 401 event
+    await act(async () => {
+      window.dispatchEvent(new Event('servicepulse_unauthorized'));
+    });
+
+    expect(getAuthToken()).toBeNull();
     expect(screen.getByTestId('auth-status').textContent).toBe('unauthenticated');
   });
 });

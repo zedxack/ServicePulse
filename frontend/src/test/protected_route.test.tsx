@@ -128,4 +128,38 @@ describe('ProtectedRoute Component and RBAC Authorization', () => {
 
     expect(screen.getByText('Secret SysAdmin Dashboard')).toBeInTheDocument();
   });
+
+  it('preserves authenticated session state when 403 forbidden is encountered', () => {
+    const mockLogout = vi.fn();
+    vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
+      user: employeeUser,
+      token: 'valid-token',
+      isLoading: false,
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: mockLogout,
+      hasRole: vi.fn().mockReturnValue(false),
+      hasAnyRole: vi.fn().mockReturnValue(false),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/platform']}>
+        <Routes>
+          <Route path="/unauthorized" element={<div>Unauthorized Access Denied - User Still Active</div>} />
+          <Route
+            path="/dashboard/platform"
+            element={
+              <ProtectedRoute allowedRoles={['platform_super_admin']}>
+                <div>Platform Dashboard</div>
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Unauthorized Access Denied - User Still Active')).toBeInTheDocument();
+    // Verify 403 authorization denial does NOT trigger logout
+    expect(mockLogout).not.toHaveBeenCalled();
+  });
 });

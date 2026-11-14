@@ -206,14 +206,14 @@ servicepulse-network-worker   network-worker   Up (healthy)              8000/tc
 
 | Test Suite | Scope | Tests Passed | Status |
 | :--- | :--- | :--- | :--- |
-| **Frontend Vitest** | Auth, ProtectedRoute, LanguageSwitcher, 5 Dashboards | **13 / 13** | **PASS** |
+| **Frontend Vitest** | Auth, ProtectedRoute, LanguageSwitcher, 5 Dashboards, Login Security | **19 / 19** | **PASS** |
 | **Frontend TypeScript** | Strict mode (`tsc --noEmit`) | **0 Errors** | **PASS** |
 | **Frontend ESLint** | React hooks, TypeScript lint (`eslint src`) | **0 Errors / 0 Warnings** | **PASS** |
-| **Production Build** | Vite bundle (`npm run build`) | **PASS (8.87s)** | **PASS** |
+| **Production Build** | Vite bundle (`npm run build`) | **PASS (7.35s)** | **PASS** |
 | **Docker Backend** | PostgreSQL integration (`pytest backend/tests`) | **62 / 62** | **PASS** |
 | **Windows Agent** | Collectors, commands, queue, security (`pytest agent/tests`) | **49 / 49** | **PASS** |
 | **Backend Ruff Linter** | PEP 8 / Code quality (`ruff check agent backend`) | **0 Errors** | **PASS** |
-| **TOTAL AUTOMATED TESTS** | Full Platform Regression | **124 / 124** | **100% GREEN** |
+| **TOTAL AUTOMATED TESTS** | Full Platform Regression | **130 / 130** | **100% GREEN** |
 
 ---
 
@@ -228,3 +228,32 @@ servicepulse-network-worker   network-worker   Up (healthy)              8000/tc
 
 - **Branch:** `feature/step-5-frontend`
 - **Initial Step 4 Commit:** `6edbc5841519ca8c804893e22d189df59bafe71a`
+- **Step 5.1 Foundation Commit:** `b8739d99cf131d186118e97e7eb31a74ca59c3f5`
+
+---
+
+## 10. Final Security & Integration Audit Sign-Off
+
+### 10.1 Demo Login Security & Production Bundle Hardening
+- **Vite Dead-Code Elimination:** Development demo credentials were extracted to a dedicated component (`frontend/src/features/auth/DevDemoAccounts.tsx`) and lazily imported via `import.meta.env.DEV ? React.lazy(() => import('./DevDemoAccounts')) : null`.
+- **Zero Production Credential Leakage:** Static analysis and byte scanning of production bundles (`frontend/dist/assets/*.js`) confirmed that seed credentials (`AdminPass2026!`, `CompanyAdminPass2026!`, etc.) and demo email shortcuts are **100% purged** from production output.
+- **Automated Verification:** Added `frontend/src/test/login.test.tsx` which explicitly tests:
+  - Production mode (`import.meta.env.DEV = false`) does not render `dev-demo-accounts` or any demo credential triggers.
+  - Form validation, credential submission, and authentication error alert rendering.
+
+### 10.2 Strict In-Memory JWT Authentication Security
+- **Elimination of Web Storage Tokens:** Replaced all `localStorage` and `sessionStorage` token writes with an in-memory closure (`setAuthToken`, `getAuthToken`, `clearAuthToken`) in `frontend/src/shared/api/client.ts`.
+- **Status 401 Unauthorized Handling:** Invalid or expired token responses immediately clear in-memory state and dispatch a `servicepulse_unauthorized` event to redirect unauthenticated sessions to `/login`.
+- **Status 403 Forbidden Session Preservation:** Non-permitted actions reject with 403 Forbidden without logging out the authenticated user. Verified via automated tests in `frontend/src/test/protected_route.test.tsx`.
+- **Zero Secret Leakage:** Access tokens and passwords are never output to browser console logs or error banners.
+
+### 10.3 Production Reverse Proxy & API Routing Parity
+- **Relative API Prefix:** The Axios API client defaults to `baseURL: '/api/v1'`.
+- **Development Proxy:** Vite dev server reverse-proxies `/api` to `http://localhost:8000`.
+- **Production Architecture:** Nginx / Caddy reverse-proxies `/api/` to `backend:8000/api/` with SPA fallback `try_files $uri $uri/ /index.html;`. Client browsers in production never connect to `localhost:8000`.
+- **Environment Isolation:** Zero backend secrets or private keys are exposed via `VITE_*` prefixes.
+
+### 10.4 Real Backend Data Contracts & SLA Compliance
+- All five dashboards strictly bind to live backend endpoints (`/api/v1/organizations`, `/api/v1/devices`, `/api/v1/incidents`, `/api/v1/audit/logs`, `/api/v1/agent-telemetry/summary`).
+- Loading skeletons, empty states, and error alerts are fully implemented across all views.
+- Contractual SLA Target (e.g. 99.9%) is rigorously separated from discrete probe success ratios. Duration-based SLA is explicitly flagged as "Unavailable until historical downtime engine is implemented" to prevent misleading representations.

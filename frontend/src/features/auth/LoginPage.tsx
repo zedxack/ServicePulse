@@ -1,9 +1,14 @@
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Activity, AlertCircle, ArrowRight, Lock, Mail, ShieldCheck } from 'lucide-react';
+import { Activity, AlertCircle, ArrowRight, Lock, Mail } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { LanguageSwitcher } from '../../shared/components/LanguageSwitcher';
+
+// Development-only demo credentials helper (strictly excluded in production builds)
+const DevDemoAccounts = import.meta.env.DEV
+  ? React.lazy(() => import('./DevDemoAccounts'))
+  : null;
 
 export const LoginPage: React.FC = () => {
   const { t } = useTranslation();
@@ -129,55 +134,12 @@ export const LoginPage: React.FC = () => {
               </button>
             </form>
 
-            {/* Quick Demo Accounts Selection */}
-            <div className="mt-8 border-t border-surface-200 pt-5">
-              <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-surface-600">
-                <ShieldCheck className="h-3.5 w-3.5 text-brand-600" />
-                <span>{t('auth.demoAccounts')}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-1.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setDemoCredentials('admin@servicepulse.uz', 'AdminPass2026!')}
-                  className="flex items-center justify-between rounded-md border border-surface-200 bg-surface-50 px-2.5 py-1.5 text-left font-medium text-surface-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                >
-                  <span>{t('auth.superAdmin')}</span>
-                  <span className="font-mono text-[10px] text-surface-500">admin@servicepulse.uz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDemoCredentials('company_admin@servicepulse.uz', 'CompanyAdminPass2026!')}
-                  className="flex items-center justify-between rounded-md border border-surface-200 bg-surface-50 px-2.5 py-1.5 text-left font-medium text-surface-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                >
-                  <span>{t('auth.companyAdmin')}</span>
-                  <span className="font-mono text-[10px] text-surface-500">company_admin@servicepulse.uz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDemoCredentials('support@servicepulse.uz', 'SupportPass2026!')}
-                  className="flex items-center justify-between rounded-md border border-surface-200 bg-surface-50 px-2.5 py-1.5 text-left font-medium text-surface-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                >
-                  <span>{t('auth.sysAdmin')}</span>
-                  <span className="font-mono text-[10px] text-surface-500">support@servicepulse.uz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDemoCredentials('executive@servicepulse.uz', 'ExecutivePass2026!')}
-                  className="flex items-center justify-between rounded-md border border-surface-200 bg-surface-50 px-2.5 py-1.5 text-left font-medium text-surface-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                >
-                  <span>{t('auth.executive')}</span>
-                  <span className="font-mono text-[10px] text-surface-500">executive@servicepulse.uz</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDemoCredentials('employee@servicepulse.uz', 'EmployeePass2026!')}
-                  className="flex items-center justify-between rounded-md border border-surface-200 bg-surface-50 px-2.5 py-1.5 text-left font-medium text-surface-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-                >
-                  <span>{t('auth.employee')}</span>
-                  <span className="font-mono text-[10px] text-surface-500">employee@servicepulse.uz</span>
-                </button>
-              </div>
-            </div>
+            {/* Quick Demo Accounts Selection — ONLY rendered in DEV mode */}
+            {import.meta.env.DEV && DevDemoAccounts && (
+              <Suspense fallback={null}>
+                <DevDemoAccounts onSelect={setDemoCredentials} />
+              </Suspense>
+            )}
           </div>
 
           <p className="text-center text-xs text-surface-400">
