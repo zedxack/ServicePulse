@@ -4,6 +4,7 @@ Strictly validates command parameter payloads against security rules.
 Author: Muhammadyusuf Usmonov (AT-Servis BMI)
 """
 import json
+import re
 from typing import Any, Dict, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator
@@ -14,6 +15,8 @@ from servicepulse.commands.allowlist import (
     VERSION_REGEX,
     CommandAllowlist,
 )
+
+SHA256_REGEX = re.compile(r"^[a-fA-F0-9]{64}$")
 
 
 class RestartServiceParams(BaseModel):
@@ -72,6 +75,8 @@ class NotifyAdminParams(BaseModel):
 class InstallApprovedSoftwareParams(BaseModel):
     software: str = Field(..., max_length=100)
     version: Optional[str] = Field(None, max_length=30)
+    sha256: Optional[str] = Field(None, max_length=64)
+    download_url: Optional[str] = Field(None, max_length=500)
 
     @field_validator("software")
     @classmethod
@@ -88,6 +93,26 @@ class InstallApprovedSoftwareParams(BaseModel):
             clean = v.strip()
             if not VERSION_REGEX.match(clean):
                 raise ValueError("Software version contains illegal characters or shell metacharacters")
+            return clean
+        return None
+
+    @field_validator("sha256")
+    @classmethod
+    def validate_sha256(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            clean = v.strip().lower()
+            if not SHA256_REGEX.match(clean):
+                raise ValueError("Cryptographic sha256 checksum must be a valid 64-character hexadecimal string")
+            return clean
+        return None
+
+    @field_validator("download_url")
+    @classmethod
+    def validate_download_url(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v.strip():
+            clean = v.strip()
+            if not clean.startswith("https://"):
+                raise ValueError("Download URL must use secure HTTPS protocol")
             return clean
         return None
 

@@ -43,22 +43,25 @@ class CredentialStore:
         self.path = credentials_path
 
     def _encrypt_bytes(self, plaintext: bytes) -> bytes:
-        """Encrypt byte sequence with Windows DPAPI (machine or user scope)."""
+        """
+        Encrypt byte sequence with Windows DPAPI using machine scope.
+        Machine scope (0x5 = CRYPTPROTECT_UI_FORBIDDEN | CRYPTPROTECT_LOCAL_MACHINE)
+        enables both the enrolling administrator and the NT AUTHORITY\\SYSTEM Windows Service
+        to decrypt the persisted credential while restricting access from other machines.
+        """
         if _HAS_WIN32CRYPT:
-            # CryptProtectData(data, description, optional_entropy, reserved, prompt_struct, flags)
-            # CRYPTPROTECT_UI_FORBIDDEN = 0x1
+            # 0x1 (CRYPTPROTECT_UI_FORBIDDEN) | 0x4 (CRYPTPROTECT_LOCAL_MACHINE) = 0x5
             return win32crypt.CryptProtectData(
                 plaintext,
                 "ServicePulse Agent Credentials",
                 None,
                 None,
                 None,
-                0x1
+                0x5
             )
         else:
             # Fallback for mock/test environments
             logger.warning("Windows DPAPI not available; using fallback encryption for testing environment")
-            # Simple XOR-based wrapper with header for testing non-Windows environments
             key = b"ServicePulseTestKey"
             enc = bytes(b ^ key[i % len(key)] for i, b in enumerate(plaintext))
             return b"SP_TEST_MOCK:" + enc
@@ -93,10 +96,20 @@ class CredentialStore:
         with open(temp_path, "wb") as f:
             f.write(encrypted)
 
-        # On Windows, set restricted file permissions if possible
+        # On Windows, set restricted NTFS file permissions (SYSTEM + Administrators + Current User only)
         if sys.platform == "win32":
             try:
-                # Grant access only to current user and SYSTEM
+                user = os.environ.get("USERNAME", "Administrators")
+                import subprocess
+                subprocess.run(
+                    ["icacls.exe", str(temp_path), "/inheritance:r", "/grant:r", "*S-1-5-18:(F)", "*S-1-5-32-544:(F)", f"{user}:(F)"],
+                    capture_output=True,
+                    check=False,
+                    timeout=5
+                )
+            except Exception as e:
+                logger.debug(f"Could not apply NTFS ACLs via icacls: {e}")
+            try:
                 os.chmod(temp_path, 0o600)
             except Exception:
                 pass

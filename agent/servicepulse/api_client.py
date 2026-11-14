@@ -3,7 +3,7 @@ ServicePulse Native Windows Agent - Backend API Client
 Manages HTTP/HTTPS communication with ServicePulse backend API.
 Author: Muhammadyusuf Usmonov (AT-Servis BMI)
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
 
@@ -39,9 +39,12 @@ class ApiClient:
     Designed for reliability, structured error handling, and offline fallback.
     """
 
-    def __init__(self, config: AgentConfig, credentials: Optional[AgentCredentials] = None):
+    def __init__(self, config: AgentConfig, credentials: Optional[Union[AgentCredentials, Any]] = None):
         self.config = config
-        self.credentials = credentials
+        if hasattr(credentials, "load_credentials"):
+            self.credentials = credentials.load_credentials()
+        else:
+            self.credentials = credentials
         self.base_url = config.server_url.rstrip("/")
         self._session = httpx.Client(
             timeout=config.request_timeout_seconds,

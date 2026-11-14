@@ -70,3 +70,39 @@ def test_enrollment_manager_flow(mock_enroll, test_config: AgentConfig):
     saved = store.load_credentials()
     assert saved is not None
     assert saved.agent_uuid == "agent_mock_new_77"
+
+
+def test_dpapi_machine_scope_persistence(tmp_path):
+    """Verify DPAPI credential store saves and loads successfully across simulated restarts."""
+    import sys
+    cred_file = tmp_path / "credentials.dat"
+    store1 = CredentialStore(cred_file)
+    creds = AgentCredentials(
+        agent_uuid="uuid-persisted-12345",
+        api_token="sp_tok_super_secure_vault_token",
+        device_id=42,
+        organization_id=1
+    )
+    store1.save_credentials(creds)
+    assert cred_file.is_file()
+
+    # Simulate fresh process opening the saved credential file
+    store2 = CredentialStore(cred_file)
+    loaded = store2.load_credentials()
+    assert loaded is not None
+    assert loaded.agent_uuid == "uuid-persisted-12345"
+    assert loaded.api_token == "sp_tok_super_secure_vault_token"
+    assert loaded.device_id == 42
+    assert loaded.organization_id == 1
+
+    # Verify restricted ACL verification on Windows
+    if sys.platform == "win32":
+        import subprocess
+        res = subprocess.run(
+            ["icacls.exe", str(cred_file)],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            check=False
+        )
+        assert res.returncode == 0

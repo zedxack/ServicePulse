@@ -4,7 +4,7 @@ Orchestrates command polling, validation, execution, and result submission.
 Author: Muhammadyusuf Usmonov (AT-Servis BMI)
 """
 import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Set
 
 from servicepulse.api_client import ApiClient
 from servicepulse.commands.execution import CommandExecutor, ExecutionResult
@@ -29,9 +29,11 @@ class CommandDispatcher:
     pending -> acknowledged -> executing -> succeeded / failed.
     """
 
-    def __init__(self, api_client: ApiClient, simulation_mode: bool = False):
+    def __init__(self, api_client: ApiClient, simulation_mode: bool = False, max_command_age_seconds: int = 3600):
         self.api_client = api_client
         self.simulation_mode = simulation_mode
+        self.max_command_age_seconds = max_command_age_seconds
+        self._processed_command_ids: Set[int] = set()
 
     def poll_and_process_commands(self) -> int:
         """
@@ -67,6 +69,11 @@ class CommandDispatcher:
         raw_params = cmd.get("parameters")
         is_sim = cmd.get("is_simulation", False) or self.simulation_mode
 
+        # 0. Deduplication check
+        if cmd_id in self._processed_command_ids:
+            logger.warning(f"Command #{cmd_id} was already executed; skipping duplicate dispatch.")
+            return
+
         logger.info(f"Processing command #{cmd_id} ('{action_name}', simulation={is_sim})")
 
         # 1. Acknowledge receipt
@@ -75,7 +82,35 @@ class CommandDispatcher:
         except Exception as e:
             logger.warning(f"Failed to acknowledge command #{cmd_id}: {e}")
 
-        # 2. Schema and allowlist validation
+        # Mark as seen in processed cache
+        self._processed_command_ids.add(cmd_id)
+
+        # 2. Expiration check
+        created_at_raw = cmd.get("created_at")
+        if created_at_raw:
+            try:
+                if isinstance(created_at_raw, str):
+                    # Handle ISO string with trailing Z or timezone
+                    clean_ts = created_at_raw.replace("Z", "+00:00")
+                    created_dt = datetime.datetime.fromisoformat(clean_ts)
+                elif isinstance(created_at_raw, datetime.datetime):
+                    created_dt = created_at_raw
+                else:
+                    created_dt = None
+
+                if created_dt:
+                    if created_dt.tzinfo is None:
+                        created_dt = created_dt.replace(tzinfo=datetime.timezone.utc)
+                    age_seconds = (datetime.datetime.now(datetime.timezone.utc) - created_dt).total_seconds()
+                    if age_seconds > self.max_command_age_seconds:
+                        error_msg = f"Command #{cmd_id} expired: age is {int(age_seconds)}s (max allowed: {self.max_command_age_seconds}s)"
+                        logger.warning(error_msg)
+                        self._report_result(cmd_id, status="failed", output=error_msg)
+                        return
+            except Exception as e:
+                logger.debug(f"Could not parse created_at timestamp for command #{cmd_id}: {e}")
+
+        # 3. Schema and allowlist validation
         try:
             validated_params = parse_and_validate_command_parameters(action_name, raw_params)
         except ValueError as ve:
