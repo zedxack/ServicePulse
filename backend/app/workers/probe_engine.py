@@ -5,6 +5,7 @@ Safe non-privileged socket/process execution with deterministic simulation adapt
 Author: Muhammadyusuf Usmonov
 """
 import asyncio
+import contextlib
 import platform
 import re
 import socket
@@ -30,6 +31,22 @@ class ProbeEngine:
     def set_simulation_override(cls, override: Optional[bool]) -> None:
         """Allows tests to force simulated probes to return True or False."""
         cls._simulation_override = override
+
+    @classmethod
+    def reset_simulation_override(cls) -> None:
+        """Reset test override back to None, isolating tests from side effects."""
+        cls._simulation_override = None
+
+    @classmethod
+    @contextlib.contextmanager
+    def temporary_simulation_override(cls, override: Optional[bool]):
+        """Context manager to reliably set and reset simulation override."""
+        prev = cls._simulation_override
+        try:
+            cls._simulation_override = override
+            yield
+        finally:
+            cls._simulation_override = prev
 
     @staticmethod
     async def probe_device(

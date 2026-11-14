@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from backend.app.core.config import settings
 from backend.app.models.inventory import Device
 from backend.app.models.monitoring import (
     DeviceMonitoringConfig,
@@ -118,13 +119,16 @@ class NetworkService:
             )
 
         # Execute Probe
+        # Safety rule: Real devices (is_sample_data=False) must NEVER enter simulation mode.
+        use_sim = False if (not dev.is_sample_data or settings.ENVIRONMENT == "production") else bool(cfg.simulation_mode)
+
         probe_res = await ProbeEngine.probe_device(
             device_id=dev.id,
             ip_address=dev.ip_address,
             check_type=probe_req.check_type,
             port=probe_req.port,
             timeout_seconds=cfg.timeout_seconds,
-            use_simulation=cfg.simulation_mode or dev.is_sample_data,
+            use_simulation=use_sim,
         )
 
         # Process Result through incident engine

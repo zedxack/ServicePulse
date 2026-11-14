@@ -53,6 +53,14 @@ class Settings(BaseSettings):
             raise ValueError("In production mode, SECRET_KEY must be a secure key with at least 32 characters.")
         return v
 
+    @field_validator("WORKER_SIMULATION_MODE")
+    @classmethod
+    def validate_worker_simulation_mode(cls, v: bool, info) -> bool:
+        env = info.data.get("ENVIRONMENT", "development")
+        if env == "production" and v is True:
+            raise ValueError("WORKER_SIMULATION_MODE cannot be enabled in production environment.")
+        return v
+
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./servicepulse.db"
     POSTGRES_SERVER: str = "localhost"
