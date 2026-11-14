@@ -4,24 +4,30 @@ ServicePulse - PostgreSQL Disaster Recovery & Restoration Utility
 Project: ServicePulse (AT-Servis BMI)
 Author: Muhammadyusuf Usmonov
 
-Features:
-- Verifies SHA-256 integrity prior to database restoration
-- Inspects and displays backup manifest metadata
-- Supports restoration to production, staging, or isolated disposable containers
-- Automatically terminates conflicting open connections if requested
-- Verifies post-restore database schema, record counts, and Alembic version
+Safety Guardrails:
+- Explicit target container requirement (no default fallback to live DB)
+- Production container protection (requires --confirm-production)
+- Pre-restoration SHA-256 integrity and metadata verification
+- Strict input validation against shell/SQL injection
+- Aborts immediately on restore or verification errors
+- Zero credential leakage
 
 Usage:
-    python scripts/restore_db.py --archive backups/servicepulse_backup_YYYYMMDD_HHMMSS.sql.gz --container servicepulse-prod-db --force
     python scripts/restore_db.py --archive backups/servicepulse_backup_YYYYMMDD_HHMMSS.sql.gz --verify-only
+    python scripts/restore_db.py --archive backups/servicepulse_backup_YYYYMMDD_HHMMSS.sql.gz --container sp-test-db --force
+    python scripts/restore_db.py --archive backups/servicepulse_backup_YYYYMMDD_HHMMSS.sql.gz --container servicepulse-prod-db --confirm-production
 """
 import argparse
 import gzip
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+DB_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
+CONTAINER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+$")
 
 
 def compute_sha256(file_path: Path) -> str:
@@ -32,26 +38,29 @@ def compute_sha256(file_path: Path) -> str:
     return sha.hexdigest()
 
 
-def verify_integrity(archive_path: Path) -> bool:
+def verify_integrity(archive_path: Path) -> tuple[bool, dict]:
     if not archive_path.exists():
         print(f"Error: Archive not found: {archive_path}", file=sys.stderr)
-        return False
+        return False, {}
 
     sha_path = archive_path.parent / f"{archive_path.name}.sha256"
     base_name = archive_path.name[:-7] if archive_path.name.endswith(".sql.gz") else archive_path.stem
     meta_path = archive_path.parent / f"{base_name}.meta.json"
 
     expected_sha = None
-    if sha_path.exists():
+    manifest = {}
+
+    if meta_path.exists():
+        try:
+            manifest = json.loads(meta_path.read_text(encoding="utf-8"))
+            expected_sha = manifest.get("sha256_checksum")
+        except Exception as exc:
+            print(f"Warning: Could not read metadata manifest: {exc}", file=sys.stderr)
+
+    if not expected_sha and sha_path.exists():
         first_line = sha_path.read_text(encoding="utf-8").strip().split()
         if first_line:
             expected_sha = first_line[0]
-    elif meta_path.exists():
-        try:
-            meta = json.loads(meta_path.read_text(encoding="utf-8"))
-            expected_sha = meta.get("sha256_checksum")
-        except Exception:
-            pass
 
     actual_sha = compute_sha256(archive_path)
 
@@ -60,7 +69,7 @@ def verify_integrity(archive_path: Path) -> bool:
             print("Error: SHA-256 checksum MISMATCH!", file=sys.stderr)
             print(f"  Expected: {expected_sha}", file=sys.stderr)
             print(f"  Actual:   {actual_sha}", file=sys.stderr)
-            return False
+            return False, manifest
         print(f"SHA-256 integrity verified successfully: {actual_sha}")
     else:
         print(f"Warning: No checksum file found. Computed SHA-256: {actual_sha}")
@@ -71,15 +80,15 @@ def verify_integrity(archive_path: Path) -> bool:
             chunk = f.read(1024)
             if not chunk:
                 print("Error: Archive is empty.", file=sys.stderr)
-                return False
+                return False, manifest
     except Exception as exc:
         print(f"Error: Gzip archive is corrupt: {exc}", file=sys.stderr)
-        return False
+        return False, manifest
 
-    return True
+    return True, manifest
 
 
-def verify_restored_database(container: str, db_user: str, db_name: str) -> bool:
+def verify_restored_database(container: str, db_user: str, db_name: str, expected_manifest: dict) -> bool:
     print("\nVerifying restored database integrity...")
 
     # Check tables
@@ -101,17 +110,28 @@ def verify_restored_database(container: str, db_user: str, db_name: str) -> bool
     missing = [tbl for tbl in expected_tables if tbl not in tables]
 
     if missing:
-        print(f"Warning: Missing expected tables: {missing}", file=sys.stderr)
-    else:
-        print(f"All {len(expected_tables)} critical tables verified present in restored database.")
+        print(f"Error: Missing required tables in restored database: {missing}", file=sys.stderr)
+        return False
+
+    print(f"All {len(expected_tables)} critical tables verified present in restored database.")
 
     # Check Alembic version
     alembic_res = subprocess.run(
         ["docker", "exec", container, "psql", "-U", db_user, "-d", db_name, "-t", "-A", "-c", "SELECT version_num FROM alembic_version LIMIT 1;"],
         capture_output=True, text=True
     )
-    alembic_rev = alembic_res.stdout.strip() if alembic_res.returncode == 0 else "unknown"
+    alembic_rev = alembic_res.stdout.strip() if alembic_res.returncode == 0 else ""
+    if not alembic_rev:
+        print("Error: Alembic revision table is missing or empty in restored database.", file=sys.stderr)
+        return False
+
     print(f"Alembic database revision: {alembic_rev}")
+
+    expected_rev = expected_manifest.get("alembic_revision")
+    if expected_rev and expected_rev != "unknown":
+        if alembic_rev != expected_rev:
+            print(f"Error: Restored Alembic revision ({alembic_rev}) does not match manifest ({expected_rev})", file=sys.stderr)
+            return False
 
     # Check user count
     user_res = subprocess.run(
@@ -135,30 +155,46 @@ def verify_restored_database(container: str, db_user: str, db_name: str) -> bool
 def main():
     parser = argparse.ArgumentParser(description="ServicePulse Database Restoration Utility")
     parser.add_argument("--archive", required=True, type=Path, help="Path to .sql.gz backup archive")
-    parser.add_argument("--container", default=None, help="Target Docker container name running PostgreSQL")
+    parser.add_argument("--container", default=None, help="Target Docker container name running PostgreSQL (MANDATORY for restore)")
     parser.add_argument("--db-name", default="servicepulse", help="Target database name")
     parser.add_argument("--db-user", default="postgres", help="Target database user")
     parser.add_argument("--verify-only", action="store_true", help="Only verify archive integrity without restoring")
-    parser.add_argument("--force", action="store_true", help="Bypass confirmation prompt")
+    parser.add_argument("--confirm-production", action="store_true", help="Explicit acknowledgement required when targeting a production container")
+    parser.add_argument("--force", action="store_true", help="Bypass interactive confirmation prompt")
 
     args = parser.parse_args()
 
     # Step 1: Integrity Verification
-    if not verify_integrity(args.archive):
+    valid, manifest = verify_integrity(args.archive)
+    if not valid:
         print("Restoration aborted: Archive integrity check failed.", file=sys.stderr)
         sys.exit(1)
 
     if args.verify_only:
-        print("Verification completed successfully. Archive is valid.")
+        print("Verification completed successfully. Archive and manifest are valid.")
         sys.exit(0)
 
-    # Step 2: Determine target container
-    container = args.container
-    if not container:
-        container = "servicepulse-prod-db"
-        res = subprocess.run(["docker", "inspect", container], capture_output=True)
-        if res.returncode != 0:
-            container = "servicepulse-db"
+    # Step 2: Strict Safety Checks on Target Container
+    if not args.container:
+        print("Error: Target container must be explicitly specified via --container.", file=sys.stderr)
+        print("Automatic defaulting to live database containers is disabled to prevent accidental data loss.", file=sys.stderr)
+        sys.exit(2)
+
+    container = args.container.strip()
+    if not CONTAINER_NAME_PATTERN.match(container):
+        print(f"Error: Invalid container name format: '{container}'", file=sys.stderr)
+        sys.exit(2)
+
+    if not DB_NAME_PATTERN.match(args.db_name):
+        print(f"Error: Invalid database name format: '{args.db_name}'", file=sys.stderr)
+        sys.exit(2)
+
+    # Production Container Protection (Checked prior to execution to prevent unauthorized attempts)
+    is_production = "prod" in container.lower()
+    if is_production and not args.confirm_production:
+        print(f"CRITICAL SAFETY GUARD: Container '{container}' appears to be a PRODUCTION database.", file=sys.stderr)
+        print("To confirm restoration to production, you MUST explicitly provide --confirm-production.", file=sys.stderr)
+        sys.exit(2)
 
     # Verify target container is running
     inspect_res = subprocess.run(
@@ -172,14 +208,14 @@ def main():
     if not args.force:
         print(f"\nCAUTION: You are about to restore {args.archive.name} into database '{args.db_name}' on container '{container}'.")
         print("Existing data in the target database will be overwritten.")
-        confirm = input("Are you sure you want to proceed? [y/N]: ").strip().lower()
-        if confirm not in ("y", "yes"):
+        confirm = input("Type 'RESTORE' to proceed: ").strip()
+        if confirm != "RESTORE":
             print("Restoration cancelled by user.")
             sys.exit(0)
 
-    print(f"Restoring database from '{args.archive.name}' into '{container}'...")
+    print(f"Restoring database from '{args.archive.name}' into container '{container}'...")
 
-    # Terminate active connections (except current)
+    # Terminate active connections to the explicitly specified database only
     terminate_sql = f"""
     SELECT pg_terminate_backend(pid)
     FROM pg_stat_activity
@@ -190,7 +226,7 @@ def main():
         capture_output=True
     )
 
-    # Decompress and pipe into psql
+    # Decompress and pipe directly into psql
     restore_cmd = ["docker", "exec", "-i", container, "psql", "-U", args.db_user, "-d", args.db_name]
 
     try:
@@ -201,15 +237,17 @@ def main():
         stdout_data, stderr_data = proc.communicate()
 
         if proc.returncode != 0:
-            print(f"Warning: psql exited with code {proc.returncode}: {stderr_data.decode()}", file=sys.stderr)
+            print(f"Error: psql exited with failure code {proc.returncode}: {stderr_data.decode()}", file=sys.stderr)
+            sys.exit(1)
 
         print("Database stream restoration finished.")
 
         # Post-restore verification
-        if verify_restored_database(container, args.db_user, args.db_name):
-            print("\nDatabase restoration and verification PASSED successfully.")
-        else:
-            print("\nWarning: Database verification encountered warnings.", file=sys.stderr)
+        if not verify_restored_database(container, args.db_user, args.db_name, manifest):
+            print("\nError: Post-restore database integrity verification FAILED.", file=sys.stderr)
+            sys.exit(1)
+
+        print("\nDatabase restoration and verification PASSED successfully.")
 
     except Exception as exc:
         print(f"Error during restoration: {exc}", file=sys.stderr)

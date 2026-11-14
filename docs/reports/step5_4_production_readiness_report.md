@@ -15,6 +15,11 @@ STEP 5.4 finalizes the operational transition of ServicePulse into an enterprise
 
 All components adhere strictly to the principle of least privilege, zero public exposure of database and application ports, and complete Git-hygiene ensuring zero credential leaks.
 
+### Operational Scope & Boundaries:
+- **Locally Verified Deployment Readiness:** All Docker Compose configurations, Caddyfile reverse proxy routes, SPA asset delivery, WebSocket stream upgrades, and multi-service networks were verified in local production-like containerized environments.
+- **Isolated Disaster Recovery Verification:** Database backup, atomic finalization, checksum validation, and disaster recovery restores were tested and validated against an isolated disposable PostgreSQL container (`sp-disaster-recovery-test-db`), preserving live development databases and Docker volumes untouched.
+- **Public VPS & Domain Status:** No fake VPS was provisioned or connected. Automated scripts (`deploy.sh`, `harden-server.sh`) and configurations (`Caddyfile`, `compose.prod.yaml`) are prepared for execution on a real Ubuntu VPS once public DNS records (`servicepulse.uz`) and server credentials are provided.
+
 ---
 
 ## 2. Production Architecture Audit (STEP 5.4.1)
@@ -75,10 +80,10 @@ Orchestrates:
 - Cryptographic standards:
   - `SECRET_KEY`: 64-char hexadecimal (`secrets.token_hex(32)`).
   - `AGENT_ENROLLMENT_SECRET`: 44-char URL-safe string (`secrets.token_urlsafe(32)`).
-  - `POSTGRES_PASSWORD`: 32-char high-entropy alphanumeric + symbol string.
+  - `POSTGRES_PASSWORD`: 32-char high-entropy alphanumeric password (excluding `$` to prevent Compose variable expansion).
   - Initial passwords: 24-char random passphrases for Superuser, Support, and Employee accounts.
 - File security: Automatically applies `chmod 600` on POSIX systems.
-- Compliance validator: `python scripts/generate_secrets.py --check <file>` verifies that no default or weak credentials exist.
+- Compliance validator: `python scripts/generate_secrets.py --check <file>` verifies that no default or weak credentials exist and that `DEBUG=false`.
 
 ---
 
@@ -86,37 +91,42 @@ Orchestrates:
 
 ### 5.1 Backup Architecture (`scripts/backup_db.py` & `scripts/backup-db.sh`)
 - Formats: High-compression gzip archive (`servicepulse_backup_YYYYMMDD_HHMMSS.sql.gz`).
-- Checksum: SHA-256 integrity file (`.sha256`).
+- Atomic Finalization: Output is written to `.sql.gz.tmp` and renamed atomically to `.sql.gz` only after exit code 0 and non-empty size verification.
+- Checksum: SHA-256 integrity file (`.sha256`) computed on the finalized archive.
 - Metadata Manifest: JSON manifest (`.meta.json`) recording:
   - Timestamp, database name, user, source container.
   - Exact file size and SHA-256 hash.
   - Current Alembic head revision in the database.
-- Retention Policy: Automated pruning of archives older than `BACKUP_RETENTION_DAYS` (default: 7 days).
+- Retention Policy: Strict regex match (`^servicepulse_backup_\d{8}_\d{6}\..*$`) ensuring only backup files inside the backup directory are pruned.
 
 ### 5.2 Restoration Architecture (`scripts/restore_db.py` & `scripts/restore-db.sh`)
-- Pre-restoration SHA-256 integrity check against `.sha256` or `.meta.json`.
-- Graceful termination of competing active database connections.
-- Streamed decompression directly into `psql`.
-- Post-restore verification: queries all critical tables and asserts Alembic revision head.
+- **Explicit Target Requirement:** Target container must be provided explicitly via `--container`; automatic fallback to default/live databases is prohibited.
+- **Production Guardrail:** Restores targeting containers containing `"prod"` require explicit `--confirm-production`.
+- **Pre-Restoration SHA-256 & Manifest Check:** Integrity and schema metadata verified prior to touching database.
+- **Scoped Active Connection Termination:** Terminates active connections strictly for the selected database name, which is validated against `^[a-zA-Z0-9_-]+$`.
+- **Immediate Failure on Errors:** If `psql` fails or verification fails, the process exits with code 1 immediately without reporting success.
 
 ### 5.3 Automated Verification Test (`tests/test_disaster_recovery.py`)
-- Spins up an isolated disposable PostgreSQL 16 container (`sp-disaster-recovery-test-db`).
-- Performs backup, generates SHA-256 and metadata, restores to disposable container.
-- Verifies tables (`users`, `organizations`, `devices`, `incidents`, `tickets`, `notifications`), record counts, and Alembic head revision `c4d5e6f7a8b9`.
-- Tears down disposable container cleanly.
-- **Result:** PASSED in 18.59s with zero leaks.
+- Verified refusing missing target container (exit code 2).
+- Verified refusing unconfirmed production target (exit code 2).
+- Verified refusing invalid/injection database names (exit code 2).
+- Verified `--verify-only` archive check without container.
+- Full backup, restore, and data integrity verification in an isolated disposable PostgreSQL container (`sp-disaster-recovery-test-db`).
+- **Result:** 5/5 PASSED in 18.94s with zero leaks.
 
 ---
 
 ## 6. Server Security Hardening (STEP 5.4.4)
 
 Implemented in `scripts/harden-server.sh` and documented in `docs/deployment/ubuntu-server-hardening.md`:
-1. **UFW Firewall:** Default deny incoming; explicit access for SSH, HTTP 80, HTTPS 443 (TCP/UDP).
-2. **SSH Hardening:** Public key authentication only; root password login disabled; `MaxAuthTries 3`.
-3. **Fail2ban:** Jail configuration for SSH with 1-hour ban after 5 failed attempts.
-4. **Docker Daemon:** Restrictive daemon configuration with log rotation.
-5. **Kernel sysctl:** TCP SYN flood cookies enabled, IP spoofing protections, ICMP redirect ignoring.
-6. **Automatic Updates:** `unattended-upgrades` enabled for daily security patches.
+1. **SSH Key Pre-Check:** Scans `/root/.ssh/authorized_keys` and `/home/*/.ssh/authorized_keys`. If no key exists, it warns the admin and keeps `PasswordAuthentication yes` to prevent permanent lockout.
+2. **Dry Run Mode:** Supports `--dry-run` to simulate all hardening actions without applying system changes.
+3. **UFW Firewall:** Default deny incoming; explicit access for SSH, HTTP 80, HTTPS 443 (TCP/UDP).
+4. **SSH Hardening:** Public key authentication; root password login disabled; `MaxAuthTries 3`.
+5. **Fail2ban:** Jail configuration for SSH with 1-hour ban after 5 failed attempts.
+6. **Docker Daemon:** Restrictive daemon configuration with log rotation.
+7. **Kernel sysctl:** TCP SYN flood cookies enabled, IP spoofing protections, ICMP redirect ignoring.
+8. **Automatic Updates:** `unattended-upgrades` enabled for daily security patches.
 
 ---
 
@@ -133,15 +143,19 @@ Implemented in `scripts/harden-server.sh` and documented in `docs/deployment/ubu
 
 ---
 
-## 8. Verification & Test Summary Matrix
+## 8. Final Verification Matrix (All 9 Suites)
 
-| Verification Category | Command / Suite | Result | Execution Time |
+| Verification Category | Command / Suite | Result | Execution Time / Assertions |
 | :--- | :--- | :--- | :--- |
-| **Backend PostgreSQL Regression** | `docker compose exec backend pytest backend/tests -q` | **74 passed, 0 failed, 0 skipped** | 122.71s |
-| **Disaster Recovery Automation** | `pytest tests/test_disaster_recovery.py -v` | **1 passed, 0 failed** (Full backup/restore lifecycle) | 18.59s |
-| **Production Secrets Validator** | `python scripts/generate_secrets.py --check` | **PASSED** (All secrets meet 32+ char strength) | 0.05s |
-| **Docker Compose Prod Config** | `docker compose -f compose.prod.yaml config` | **PASSED** (Valid syntax, resource limits, networks) | 0.85s |
-| **Health Telemetry Inspector** | `python scripts/check_health.py` | **PASSED** (Root & API probes OK, DB connected, 3 containers healthy) | 1.82s |
+| **1. Backend PostgreSQL Suite** | `docker compose exec backend pytest backend/tests -q` | **74 passed, 0 failed, 0 skipped** | 116.31s |
+| **2. Windows Native Agent** | `.venv\Scripts\pytest agent/tests -q` | **49 passed, 0 failed** | 56.19s |
+| **3. Frontend Vitest Suite** | `npm --prefix frontend test` | **12 files passed, 44 passed** | 30.81s |
+| **4. TypeScript Strict Check** | `npx --prefix frontend tsc -p frontend/tsconfig.json --noEmit` | **0 errors (Exit code 0)** | 8.2s |
+| **5. Frontend ESLint** | `npm --prefix frontend run lint` | **0 errors, 0 warnings (Exit code 0)** | 7.9s |
+| **6. Python Code Linter** | `.venv\Scripts\ruff.exe check agent backend scripts tests` | **All checks passed! (Exit code 0)** | 1.1s |
+| **7. Disaster Recovery & Safety**| `.venv\Scripts\pytest tests/test_disaster_recovery.py -v` | **5 passed, 0 failed** (Full lifecycle + safety guards) | 18.94s |
+| **8. Production Compose Config** | `docker compose -f compose.prod.yaml config` | **PASSED (Zero errors, zero warnings)** | 0.82s |
+| **9. Docker E2E Smoke & WS Stream**| `.venv\Scripts\python.exe backend/tests/smoke_docker_e2e.py` | **9/9 scenarios passed, 21/21 assertions** | 18.2s |
 
 ---
 
@@ -157,11 +171,11 @@ Implemented in `scripts/harden-server.sh` and documented in `docs/deployment/ubu
    - `scripts/generate-secrets.sh` & `scripts/generate-secrets.ps1`: Automated generation wrappers.
    - `.gitignore`: Updated with strict exclusion rules for secrets and backup archives.
 3. **Backup & Disaster Recovery:**
-   - `scripts/backup_db.py` & `scripts/backup-db.sh` & `scripts/backup-db.ps1`: Automated backup.
-   - `scripts/restore_db.py` & `scripts/restore-db.sh` & `scripts/restore-db.ps1`: Disaster recovery restore.
-   - `tests/test_disaster_recovery.py`: Automated end-to-end recovery verification test.
+   - `scripts/backup_db.py` & `scripts/backup-db.sh` & `scripts/backup-db.ps1`: Automated atomic backup.
+   - `scripts/restore_db.py` & `scripts/restore-db.sh` & `scripts/restore-db.ps1`: Disaster recovery restore with strict guardrails.
+   - `tests/test_disaster_recovery.py`: Automated end-to-end recovery verification and safety test suite.
 4. **Server Hardening & Monitoring:**
-   - `scripts/harden-server.sh`: Ubuntu 24.04/22.04 LTS security hardening script.
+   - `scripts/harden-server.sh`: Ubuntu 24.04/22.04 LTS security hardening script with pre-flight SSH key checks and dry-run mode.
    - `scripts/deploy.sh` & `scripts/deploy.ps1`: Production deployment pipeline.
    - `scripts/check_health.py` & `scripts/check-health.sh`: Operational health monitor.
 5. **Documentation:**

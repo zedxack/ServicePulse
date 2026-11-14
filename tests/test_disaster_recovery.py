@@ -4,11 +4,12 @@ Project: ServicePulse (AT-Servis BMI)
 Author: Muhammadyusuf Usmonov
 
 Verifies:
-1. Full database backup generation with SHA-256 and JSON metadata.
-2. Launch of an isolated disposable PostgreSQL 16 container.
-3. Database restoration from compressed backup archive.
-4. Data integrity verification (table presence, row counts, Alembic revision).
-5. Safe teardown of disposable verification container.
+1. Safety guardrails: refusing missing or ambiguous targets, production safety checks.
+2. Full database backup generation with SHA-256 and JSON metadata.
+3. Launch of an isolated disposable PostgreSQL 16 container.
+4. Database restoration from compressed backup archive.
+5. Data integrity verification (table presence, row counts, Alembic revision).
+6. Safe teardown of disposable verification container.
 """
 import os
 import subprocess
@@ -23,6 +24,85 @@ TEST_DB_PASS = "test_recovery_password_2026"
 
 def cleanup_container():
     subprocess.run(["docker", "rm", "-f", DISPOSABLE_CONTAINER], capture_output=True)
+
+
+def get_or_create_backup() -> Path:
+    backup_dir = Path("backups")
+    backup_script = Path("scripts/backup_db.py")
+
+    archives = sorted(backup_dir.glob("servicepulse_backup_*.sql.gz"), key=os.path.getmtime, reverse=True)
+    if not archives:
+        res = subprocess.run(
+            ["python", str(backup_script), "--container", "servicepulse-db", "--backup-dir", str(backup_dir)],
+            capture_output=True, text=True
+        )
+        assert res.returncode == 0, f"Backup creation failed: {res.stderr}"
+        archives = sorted(backup_dir.glob("servicepulse_backup_*.sql.gz"), key=os.path.getmtime, reverse=True)
+
+    assert len(archives) > 0
+    return archives[0]
+
+
+def test_restore_refuses_missing_container():
+    """Verify restore utility strictly refuses to run without an explicit target container."""
+    archive = get_or_create_backup()
+    restore_script = Path("scripts/restore_db.py")
+
+    res = subprocess.run(
+        ["python", str(restore_script), "--archive", str(archive)],
+        capture_output=True, text=True
+    )
+    assert res.returncode == 2, f"Expected exit code 2 for missing container, got {res.returncode}"
+    assert "Target container must be explicitly specified" in res.stderr
+
+
+def test_restore_refuses_unconfirmed_production_target():
+    """Verify restore utility refuses to touch production container without --confirm-production."""
+    archive = get_or_create_backup()
+    restore_script = Path("scripts/restore_db.py")
+
+    res = subprocess.run(
+        [
+            "python", str(restore_script),
+            "--archive", str(archive),
+            "--container", "servicepulse-prod-db",
+            "--force"
+        ],
+        capture_output=True, text=True
+    )
+    assert res.returncode == 2, f"Expected exit code 2 for unconfirmed production target, got {res.returncode}"
+    assert "CRITICAL SAFETY GUARD" in res.stderr
+
+
+def test_restore_refuses_invalid_db_name():
+    """Verify restore utility rejects illegal characters in database name to prevent command/SQL injection."""
+    archive = get_or_create_backup()
+    restore_script = Path("scripts/restore_db.py")
+
+    res = subprocess.run(
+        [
+            "python", str(restore_script),
+            "--archive", str(archive),
+            "--container", "dummy-container",
+            "--db-name", "servicepulse;DROP TABLE users;"
+        ],
+        capture_output=True, text=True
+    )
+    assert res.returncode == 2, f"Expected exit code 2 for invalid DB name, got {res.returncode}"
+    assert "Invalid database name format" in res.stderr
+
+
+def test_restore_verify_only_succeeds_without_container():
+    """Verify --verify-only successfully validates archive integrity without container requirement."""
+    archive = get_or_create_backup()
+    restore_script = Path("scripts/restore_db.py")
+
+    res = subprocess.run(
+        ["python", str(restore_script), "--archive", str(archive), "--verify-only"],
+        capture_output=True, text=True
+    )
+    assert res.returncode == 0, f"Verify-only failed: {res.stderr}"
+    assert "Verification completed successfully" in res.stdout
 
 
 def test_disaster_recovery_workflow():

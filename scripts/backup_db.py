@@ -5,24 +5,32 @@ Project: ServicePulse (AT-Servis BMI)
 Author: Muhammadyusuf Usmonov
 
 Features:
-- Executes pg_dump via Docker Compose into compressed .sql.gz
+- Executes pg_dump via Docker into compressed .sql.gz atomically (via .tmp)
 - Generates SHA-256 checksum (.sha256)
 - Generates JSON metadata manifest (.meta.json) with Alembic revision
-- Configurable retention policy (default: 7 days) with automated pruning
+- Configurable retention policy (default: 7 days) with strict safe pruning
 - Pre-flight database reachability and disk space verification
+- Restrictive file permissions (chmod 600/700) on POSIX
 
 Usage:
-    python scripts/backup_db.py --compose-file compose.prod.yaml --backup-dir ./backups
     python scripts/backup_db.py --container servicepulse-db --backup-dir ./backups
+    python scripts/backup_db.py --compose-file compose.prod.yaml --backup-dir ./backups
 """
 import argparse
 import datetime
+import gzip
 import hashlib
 import json
+import os
+import re
 import shutil
+import stat
 import subprocess
 import sys
 from pathlib import Path
+
+BACKUP_PATTERN = re.compile(r"^servicepulse_backup_\d{8}_\d{6}\.(sql\.gz|sql\.gz\.sha256|meta\.json)$")
+DB_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 def compute_sha256(file_path: Path) -> str:
@@ -52,8 +60,18 @@ def prune_old_backups(backup_dir: Path, retention_days: int):
     now = datetime.datetime.now(datetime.timezone.utc)
     cutoff = now - datetime.timedelta(days=retention_days)
     pruned_count = 0
+    resolved_backup_dir = backup_dir.resolve()
 
-    for file in backup_dir.glob("servicepulse_backup_*.*"):
+    for file in backup_dir.iterdir():
+        if not file.is_file():
+            continue
+        # Strict pattern match to prevent deleting unrelated files
+        if not BACKUP_PATTERN.match(file.name):
+            continue
+        # Verify file stays strictly inside backup directory (no symlink traversal)
+        if resolved_backup_dir not in file.resolve().parents and file.resolve().parent != resolved_backup_dir:
+            continue
+
         try:
             mtime = datetime.datetime.fromtimestamp(file.stat().st_mtime, tz=datetime.timezone.utc)
             if mtime < cutoff:
@@ -65,6 +83,15 @@ def prune_old_backups(backup_dir: Path, retention_days: int):
 
     if pruned_count > 0:
         print(f"Retention policy applied: pruned {pruned_count} old file(s) older than {retention_days} days.")
+
+
+def set_restrictive_permissions(path: Path, is_dir: bool = False):
+    if os.name != "nt":
+        try:
+            mode = (stat.S_IRWXU) if is_dir else (stat.S_IRUSR | stat.S_IWUSR)
+            os.chmod(path, mode)
+        except Exception:
+            pass
 
 
 def main():
@@ -79,11 +106,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Validate database name
+    if not DB_NAME_PATTERN.match(args.db_name):
+        print(f"Error: Invalid database name: {args.db_name}", file=sys.stderr)
+        sys.exit(1)
+
     # Determine container name
     container = args.container
     if not container:
         if args.compose_file:
-            # Check if container is running via compose
             try:
                 out = subprocess.check_output(
                     ["docker", "compose", "-f", args.compose_file, "ps", "-q", args.service],
@@ -95,7 +126,6 @@ def main():
                 pass
         if not container:
             container = "servicepulse-prod-db"
-            # Fallback to dev db if prod is not running
             res = subprocess.run(["docker", "inspect", container], capture_output=True)
             if res.returncode != 0:
                 container = "servicepulse-db"
@@ -110,10 +140,12 @@ def main():
         sys.exit(1)
 
     args.backup_dir.mkdir(parents=True, exist_ok=True)
+    set_restrictive_permissions(args.backup_dir, is_dir=True)
 
     timestamp_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
     base_name = f"servicepulse_backup_{timestamp_str}"
-    dump_file = args.backup_dir / f"{base_name}.sql.gz"
+    tmp_dump_file = args.backup_dir / f"{base_name}.sql.gz.tmp"
+    final_dump_file = args.backup_dir / f"{base_name}.sql.gz"
     sha_file = args.backup_dir / f"{base_name}.sql.gz.sha256"
     meta_file = args.backup_dir / f"{base_name}.meta.json"
 
@@ -126,31 +158,35 @@ def main():
         print(f"Error: Database is not ready: {ping_res.stderr}", file=sys.stderr)
         sys.exit(1)
 
-    # Execute pg_dump and compress via gzip
-    import gzip
+    # Execute pg_dump and compress via gzip into temporary file
     dump_cmd = ["docker", "exec", container, "pg_dump", "-U", args.db_user, "-d", args.db_name, "--clean", "--if-exists"]
 
     try:
         proc = subprocess.Popen(dump_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        with gzip.open(dump_file, "wb", compresslevel=9) as gz_out:
+        with gzip.open(tmp_dump_file, "wb", compresslevel=9) as gz_out:
             shutil.copyfileobj(proc.stdout, gz_out)
         _, stderr_data = proc.communicate()
 
         if proc.returncode != 0:
-            if dump_file.exists():
-                dump_file.unlink()
+            if tmp_dump_file.exists():
+                tmp_dump_file.unlink()
             print(f"Error: pg_dump failed with return code {proc.returncode}: {stderr_data.decode()}", file=sys.stderr)
             sys.exit(1)
 
-        file_size = dump_file.stat().st_size
+        file_size = tmp_dump_file.stat().st_size
         if file_size == 0:
-            dump_file.unlink()
+            tmp_dump_file.unlink()
             print("Error: Generated backup dump is empty.", file=sys.stderr)
             sys.exit(1)
 
-        # Compute SHA-256
-        checksum = compute_sha256(dump_file)
-        sha_file.write_text(f"{checksum}  {dump_file.name}\n", encoding="utf-8")
+        # Atomically rename .tmp to final .sql.gz
+        tmp_dump_file.replace(final_dump_file)
+        set_restrictive_permissions(final_dump_file)
+
+        # Compute SHA-256 strictly on finalized archive
+        checksum = compute_sha256(final_dump_file)
+        sha_file.write_text(f"{checksum}  {final_dump_file.name}\n", encoding="utf-8")
+        set_restrictive_permissions(sha_file)
 
         # Fetch Alembic revision
         alembic_rev = get_alembic_version(container, args.db_user, args.db_name)
@@ -161,7 +197,7 @@ def main():
             "database_name": args.db_name,
             "database_user": args.db_user,
             "container_source": container,
-            "archive_filename": dump_file.name,
+            "archive_filename": final_dump_file.name,
             "file_size_bytes": file_size,
             "sha256_checksum": checksum,
             "alembic_revision": alembic_rev,
@@ -170,9 +206,10 @@ def main():
             "purpose": "AT-Servis BMI Production Backup",
         }
         meta_file.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        set_restrictive_permissions(meta_file)
 
         print("Backup created successfully:")
-        print(f"  - Archive:  {dump_file} ({file_size / 1024:.1f} KB)")
+        print(f"  - Archive:  {final_dump_file} ({file_size / 1024:.1f} KB)")
         print(f"  - SHA-256:  {checksum}")
         print(f"  - Alembic:  {alembic_rev}")
         print(f"  - Metadata: {meta_file}")
@@ -181,8 +218,10 @@ def main():
         prune_old_backups(args.backup_dir, args.retention_days)
 
     except Exception as exc:
-        if dump_file.exists():
-            dump_file.unlink()
+        if tmp_dump_file.exists():
+            tmp_dump_file.unlink()
+        if final_dump_file.exists() and final_dump_file.stat().st_size == 0:
+            final_dump_file.unlink()
         print(f"Backup failed: {exc}", file=sys.stderr)
         sys.exit(1)
 

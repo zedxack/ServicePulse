@@ -26,7 +26,8 @@ from pathlib import Path
 
 
 def generate_alphanumeric_password(length: int = 32) -> str:
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+    # Exclude '$' to prevent unwanted variable interpolation in Docker Compose
+    alphabet = string.ascii_letters + string.digits + "!@#%*()-_=+"
     # Ensure at least one lowercase, uppercase, digit, and symbol
     while True:
         pwd = "".join(secrets.choice(alphabet) for _ in range(length))
@@ -34,7 +35,7 @@ def generate_alphanumeric_password(length: int = 32) -> str:
             any(c.islower() for c in pwd)
             and any(c.isupper() for c in pwd)
             and any(c.isdigit() for c in pwd)
-            and any(c in "!@#$%^&*()-_=+" for c in pwd)
+            and any(c in "!@#%*()-_=+" for c in pwd)
         ):
             return pwd
 
