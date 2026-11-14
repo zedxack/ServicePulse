@@ -8,6 +8,12 @@ import { CompanyDashboardPage } from '../../features/dashboard/CompanyDashboardP
 import { SysAdminDashboardPage } from '../../features/dashboard/SysAdminDashboardPage';
 import { ExecutiveDashboardPage } from '../../features/dashboard/ExecutiveDashboardPage';
 import { EmployeeDashboardPage } from '../../features/dashboard/EmployeeDashboardPage';
+import { InventoryExplorerPage } from '../../features/inventory/InventoryExplorerPage';
+import { IncidentsPage } from '../../features/incidents/IncidentsPage';
+import { IncidentDetailPage } from '../../features/incidents/IncidentDetailPage';
+import { HelpdeskPage } from '../../features/tickets/HelpdeskPage';
+import { TicketDetailPage } from '../../features/tickets/TicketDetailPage';
+import { SoftwarePage } from '../../features/software/SoftwarePage';
 import { UnauthorizedPage } from '../pages/UnauthorizedPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { useAuth } from '../../features/auth/AuthContext';
@@ -74,6 +80,30 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard/employee',
         element: <EmployeeDashboardPage />,
+      },
+      {
+        path: 'inventory',
+        element: <InventoryExplorerPage />,
+      },
+      {
+        path: 'incidents',
+        element: <IncidentsPage />,
+      },
+      {
+        path: 'incidents/:incidentId',
+        element: <IncidentDetailPage />,
+      },
+      {
+        path: 'tickets',
+        element: <HelpdeskPage />,
+      },
+      {
+        path: 'tickets/:ticketId',
+        element: <TicketDetailPage />,
+      },
+      {
+        path: 'software',
+        element: <SoftwarePage />,
       },
     ],
   },

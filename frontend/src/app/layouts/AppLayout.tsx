@@ -7,9 +7,13 @@ import {
   ChevronRight,
   HardDrive,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
+  Package,
   PieChart,
+  Server,
+  ShieldAlert,
   User as UserIcon,
   X,
 } from 'lucide-react';
@@ -65,6 +69,33 @@ export const AppLayout: React.FC = () => {
     },
   ];
 
+  const operationItems = [
+    {
+      to: '/inventory',
+      label: t('nav.inventory'),
+      icon: Server,
+      visible: true,
+    },
+    {
+      to: '/incidents',
+      label: t('nav.incidents'),
+      icon: ShieldAlert,
+      visible: true,
+    },
+    {
+      to: '/tickets',
+      label: t('nav.helpdesk'),
+      icon: LifeBuoy,
+      visible: true,
+    },
+    {
+      to: '/software',
+      label: t('nav.software'),
+      icon: Package,
+      visible: true,
+    },
+  ];
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-surface-100">
       {/* Sidebar for Desktop */}
@@ -81,41 +112,74 @@ export const AppLayout: React.FC = () => {
         </div>
 
         {/* Navigation Section */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-            {t('nav.dashboard')}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+          <div>
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+              {t('nav.dashboard')}
+            </div>
+            <nav className="space-y-1">
+              {navItems
+                .filter((item) => item.visible)
+                .map((item) => {
+                  const Icon = item.icon;
+                  const isPrimary = user?.primary_dashboard && item.to.includes(user.primary_dashboard);
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                          isActive
+                            ? 'bg-brand-50 text-brand-700 shadow-xs'
+                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                      {isPrimary && (
+                        <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold text-brand-800">
+                          {t('nav.myDashboard')}
+                        </span>
+                      )}
+                    </NavLink>
+                  );
+                })}
+            </nav>
           </div>
-          <nav className="space-y-1">
-            {navItems
-              .filter((item) => item.visible)
-              .map((item) => {
-                const Icon = item.icon;
-                const isPrimary = user?.primary_dashboard && item.to.includes(user.primary_dashboard);
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                        isActive
-                          ? 'bg-brand-50 text-brand-700 shadow-xs'
-                          : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
-                      }`
-                    }
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span>{item.label}</span>
-                    </div>
-                    {isPrimary && (
-                      <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold text-brand-800">
-                        {t('nav.myDashboard')}
-                      </span>
-                    )}
-                  </NavLink>
-                );
-              })}
-          </nav>
+
+          <div>
+            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+              Amaliyotlar (Operations)
+            </div>
+            <nav className="space-y-1">
+              {operationItems
+                .filter((item) => item.visible)
+                .map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      className={({ isActive }) =>
+                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                          isActive
+                            ? 'bg-brand-50 text-brand-700 shadow-xs'
+                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                        }`
+                      }
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                    </NavLink>
+                  );
+                })}
+            </nav>
+          </div>
         </div>
 
         {/* Footer User Info & Logout */}
@@ -156,31 +220,66 @@ export const AppLayout: React.FC = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">
-              <nav className="space-y-1">
-                {navItems
-                  .filter((item) => item.visible)
-                  .map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${
-                            isActive
-                              ? 'bg-brand-50 text-brand-700'
-                              : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
-                          }`
-                        }
-                      >
-                        <Icon className="h-4 w-4" />
-                        <span>{item.label}</span>
-                      </NavLink>
-                    );
-                  })}
-              </nav>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div>
+                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+                  {t('nav.dashboard')}
+                </div>
+                <nav className="space-y-1">
+                  {navItems
+                    .filter((item) => item.visible)
+                    .map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${
+                              isActive
+                                ? 'bg-brand-50 text-brand-700'
+                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            }`
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                </nav>
+              </div>
+
+              <div>
+                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
+                  Amaliyotlar
+                </div>
+                <nav className="space-y-1">
+                  {operationItems
+                    .filter((item) => item.visible)
+                    .map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={({ isActive }) =>
+                            `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${
+                              isActive
+                                ? 'bg-brand-50 text-brand-700'
+                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            }`
+                          }
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                </nav>
+              </div>
             </div>
             <div className="border-t border-surface-200 p-4">
               <button
