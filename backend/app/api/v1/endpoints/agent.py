@@ -2,7 +2,7 @@
 ServicePulse - Agent Enrollment, Heartbeat & Telemetry Endpoints
 Author: Muhammadyusuf Usmonov
 """
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,10 @@ from backend.app.db.session import get_db
 from backend.app.models.agent import Agent, AgentCommand
 from backend.app.models.user import User
 from backend.app.schemas.agent import (
+    AgentCommandAckResponse,
     AgentCommandRead,
+    AgentCommandResultRequest,
+    AgentCommandResultResponse,
     AgentEnrollRequest,
     AgentEnrollResponse,
     AgentHeartbeatRequest,
@@ -81,6 +84,111 @@ async def get_agent_me(
     current_agent: Agent = Depends(get_current_agent)
 ) -> Agent:
     return current_agent
+
+
+@router.get(
+    "/me/commands",
+    response_model=List[AgentCommandRead],
+    summary="Poll pending remediation commands for the authenticated agent"
+)
+async def poll_agent_commands(
+    status_filter: Optional[str] = Query(None, alias="status", description="Optional filter, e.g. pending"),
+    limit: int = Query(50, ge=1, le=100),
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> List[AgentCommand]:
+    return await AgentService.get_agent_pending_commands(
+        current_agent, db, status_filter=status_filter, limit=limit
+    )
+
+
+@router.get(
+    "/commands/pending",
+    response_model=List[AgentCommandRead],
+    summary="Alias for polling pending commands for authenticated agent"
+)
+async def poll_agent_commands_alias(
+    limit: int = Query(50, ge=1, le=100),
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> List[AgentCommand]:
+    return await AgentService.get_agent_pending_commands(
+        current_agent, db, status_filter="pending", limit=limit
+    )
+
+
+@router.post(
+    "/me/commands/{command_id}/ack",
+    response_model=AgentCommandAckResponse,
+    summary="Acknowledge command receipt by authenticated agent"
+)
+async def acknowledge_agent_command(
+    command_id: int,
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> AgentCommandAckResponse:
+    cmd = await AgentService.acknowledge_agent_command(current_agent, command_id, db)
+    return AgentCommandAckResponse(
+        command_id=cmd.id,
+        status="acknowledged",
+        message="Command successfully acknowledged by agent"
+    )
+
+
+@router.post(
+    "/commands/{command_id}/ack",
+    response_model=AgentCommandAckResponse,
+    summary="Alias for acknowledging command receipt"
+)
+async def acknowledge_agent_command_alias(
+    command_id: int,
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> AgentCommandAckResponse:
+    cmd = await AgentService.acknowledge_agent_command(current_agent, command_id, db)
+    return AgentCommandAckResponse(
+        command_id=cmd.id,
+        status="acknowledged",
+        message="Command successfully acknowledged by agent"
+    )
+
+
+@router.post(
+    "/me/commands/{command_id}/result",
+    response_model=AgentCommandResultResponse,
+    summary="Report command execution result by authenticated agent"
+)
+async def report_agent_command_result(
+    command_id: int,
+    req: AgentCommandResultRequest,
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> AgentCommandResultResponse:
+    cmd = await AgentService.report_agent_command_result(current_agent, command_id, req, db)
+    return AgentCommandResultResponse(
+        command_id=cmd.id,
+        status=cmd.status,
+        message=f"Command execution result recorded: {cmd.status}"
+    )
+
+
+@router.post(
+    "/commands/{command_id}/result",
+    response_model=AgentCommandResultResponse,
+    summary="Alias for reporting command execution result"
+)
+async def report_agent_command_result_alias(
+    command_id: int,
+    req: AgentCommandResultRequest,
+    current_agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db)
+) -> AgentCommandResultResponse:
+    cmd = await AgentService.report_agent_command_result(current_agent, command_id, req, db)
+    return AgentCommandResultResponse(
+        command_id=cmd.id,
+        status=cmd.status,
+        message=f"Command execution result recorded: {cmd.status}"
+    )
 
 
 @router.get(

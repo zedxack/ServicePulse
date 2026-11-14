@@ -1,0 +1,8 @@
+# ServicePulse Native Windows Agent Dependencies
+# Windows 11 x64 / Python 3.12
+# Author: Muhammadyusuf Usmonov (AT-Servis BMI)
+
+httpx>=0.28.0,<0.29.0
+pydantic>=2.10.0,<3.0.0
+psutil>=7.0.0
+pywin32>=308; sys_platform == 'win32'

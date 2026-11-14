@@ -91,3 +91,74 @@ async def test_agent_heartbeat_and_telemetry_flow(client: AsyncClient):
     assert dup_resp.status_code == 201
     assert dup_resp.json()["is_duplicate"] is True
     assert dup_resp.json()["status"] == "ignored_duplicate"
+
+
+@pytest.mark.asyncio
+async def test_agent_command_lifecycle(client: AsyncClient, test_db):
+    """Verify agent command polling, acknowledgment, and result reporting."""
+    from backend.app.models.agent import Agent, AgentCommand
+
+    # 1. Enroll agent
+    enroll_resp = await client.post(
+        "/api/v1/agent/enroll",
+        json={
+            "enrollment_secret": settings.AGENT_ENROLLMENT_SECRET,
+            "hostname": "CMD-HOST-01",
+            "ip_address": "192.168.10.22",
+            "os_name": "Windows 11 Pro",
+            "version": "1.0.0"
+        }
+    )
+    agent_data = enroll_resp.json()
+    api_token = agent_data["api_token"]
+    agent_headers = {"X-Agent-Token": api_token}
+
+    # Query agent DB record to get id
+    from sqlalchemy import select
+    res = await test_db.execute(select(Agent).where(Agent.agent_uuid == agent_data["agent_uuid"]))
+    agent = res.scalar_one()
+
+    # 2. Insert a pending AgentCommand for this agent
+    cmd = AgentCommand(
+        agent_id=agent.id,
+        device_id=agent.device_id,
+        action_name="restart_service",
+        parameters='{"service_name": "spooler"}',
+        status="pending",
+        verification_status="pending",
+    )
+    test_db.add(cmd)
+    await test_db.commit()
+    await test_db.refresh(cmd)
+
+    # 3. Agent polls pending commands via /api/v1/agent/me/commands
+    poll_resp = await client.get("/api/v1/agent/me/commands?status=pending", headers=agent_headers)
+    assert poll_resp.status_code == 200
+    cmds = poll_resp.json()
+    assert len(cmds) == 1
+    assert cmds[0]["id"] == cmd.id
+    assert cmds[0]["action_name"] == "restart_service"
+
+    # Also check /api/v1/agent/commands/pending alias
+    alias_resp = await client.get("/api/v1/agent/commands/pending", headers=agent_headers)
+    assert alias_resp.status_code == 200
+    assert len(alias_resp.json()) == 1
+
+    # 4. Agent acknowledges command receipt
+    ack_resp = await client.post(f"/api/v1/agent/me/commands/{cmd.id}/ack", headers=agent_headers)
+    assert ack_resp.status_code == 200
+    assert ack_resp.json()["status"] == "acknowledged"
+
+    # 5. Agent submits execution result
+    result_payload = {
+        "status": "succeeded",
+        "execution_result": "Service 'spooler' restarted successfully. Service status: RUNNING."
+    }
+    res_resp = await client.post(f"/api/v1/agent/me/commands/{cmd.id}/result", json=result_payload, headers=agent_headers)
+    assert res_resp.status_code == 200
+    assert res_resp.json()["status"] == "succeeded"
+
+    # 6. Verify DB state of command
+    await test_db.refresh(cmd)
+    assert cmd.status == "succeeded"
+    assert "Service 'spooler' restarted successfully" in cmd.execution_result

@@ -1,0 +1,13 @@
+{
+  "server_url": "http://localhost:8000",
+  "agent_name": "LAB2-PC01",
+  "heartbeat_interval_seconds": 30,
+  "telemetry_interval_seconds": 60,
+  "command_poll_interval_seconds": 15,
+  "request_timeout_seconds": 10,
+  "offline_queue_max_records": 10000,
+  "log_level": "INFO",
+  "verify_ssl": true,
+  "data_dir": null,
+  "ca_bundle_path": null
+}

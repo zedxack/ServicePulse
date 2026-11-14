@@ -109,3 +109,21 @@ class AgentCommandRead(BaseModel):
     executed_at: Optional[datetime] = None
     verified_at: Optional[datetime] = None
     created_at: datetime
+
+
+class AgentCommandAckResponse(BaseModel):
+    command_id: int
+    status: str = "acknowledged"
+    message: str = "Command successfully acknowledged by agent"
+
+
+class AgentCommandResultRequest(BaseModel):
+    status: str = Field(..., max_length=30, description="Status: succeeded, failed, or executing")
+    execution_result: Optional[str] = Field(None, description="Execution output log or details")
+    executed_at: Optional[datetime] = None
+
+
+class AgentCommandResultResponse(BaseModel):
+    command_id: int
+    status: str
+    message: str

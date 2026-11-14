@@ -115,13 +115,11 @@ uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 | Component | Status | Verification |
 |---|---|---|
 | **Phase 0: Environment Audit & Setup** | **IMPLEMENTED** | Python 3.12, Node.js, npm, Git verified |
-| **Phase 1: Backend Foundation & DB Models** | **IMPLEMENTED** | All 13 ORM models created, Alembic migrations generated and applied |
-| **Phase 1: Seed Infrastructure** | **IMPLEMENTED** | Asosiy Bino -> 2-qavat -> 204-Laboratoriya (6 demo devices) |
-| **Phase 1: Automated Unit & Integration Tests**| **TESTED** | 11/11 tests passing in pytest |
-| **Phase 2: Business Logic & API Layer** | *PENDING APPROVAL* | Ready to start upon review |
-| **Phase 3: Network Monitoring & Remediation** | *PENDING* | Planned |
-| **Phase 4: Native Windows Agent** | *PENDING* | Planned |
-| **Phase 5: React Enterprise UI** | *PENDING* | Planned |
+| **Phase 1: Backend Foundation & DB Models** | **ACCEPTED** | All 13 ORM models created, Alembic migrations generated and applied |
+| **Phase 2: Business Logic & API Layer** | **ACCEPTED** | Multi-tenant RBAC, all 8 cross-tenant isolation endpoints verified (39/39 tests) |
+| **Phase 3: Network Monitoring & Remediation** | **ACCEPTED** | Independent worker, SLA calculation, simulation safety, lease lock (61/61 tests) |
+| **Phase 4: Native Windows Agent** | **IMPLEMENTED** | Real telemetry, DPAPI vault, offline SQLite queue, safe allowlist, Windows Service, 41/41 tests passing |
+| **Phase 5: React Enterprise UI** | *PENDING APPROVAL* | Ready to start upon Step 4 review |
 | **Phase 6: End-to-End System Integration** | *PENDING* | Planned |
 | **Phase 7: VPS & HTTPS Domain Deployment** | *PENDING* | Prepared (compose.prod.yaml, Caddyfile) |
 | **Phase 8: BMI Defense Validation & Metrics**| *PENDING* | Experimental test design documented |

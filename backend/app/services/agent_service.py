@@ -19,6 +19,7 @@ from backend.app.models.agent import Agent, AgentCommand, AgentTelemetry
 from backend.app.models.audit import AuditLog
 from backend.app.models.inventory import Device
 from backend.app.schemas.agent import (
+    AgentCommandResultRequest,
     AgentEnrollRequest,
     AgentEnrollResponse,
     AgentHeartbeatRequest,
@@ -276,4 +277,87 @@ class AgentService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
         if scoped_org_id is not None and cmd.agent and cmd.agent.organization_id != scoped_org_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found")
+        return cmd
+
+    @staticmethod
+    async def get_agent_pending_commands(
+        agent: Agent,
+        db: AsyncSession,
+        status_filter: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[AgentCommand]:
+        """Fetch pending/dispatched commands assigned to the calling agent."""
+        q = select(AgentCommand).where(AgentCommand.agent_id == agent.id)
+        if status_filter:
+            q = q.where(AgentCommand.status == status_filter)
+        else:
+            q = q.where(AgentCommand.status.in_(["pending", "dispatched", "acknowledged"]))
+        q = q.order_by(AgentCommand.created_at.asc()).limit(limit)
+        result = await db.execute(q)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def acknowledge_agent_command(
+        agent: Agent,
+        command_id: int,
+        db: AsyncSession,
+    ) -> AgentCommand:
+        """Acknowledge receipt of a command by the assigned agent."""
+        q = select(AgentCommand).where(AgentCommand.id == command_id)
+        cmd = (await db.execute(q)).scalar_one_or_none()
+        if not cmd or cmd.agent_id != agent.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found for this agent")
+
+        cmd.status = "acknowledged"
+        db.add(cmd)
+        await db.commit()
+        await db.refresh(cmd)
+        return cmd
+
+    @staticmethod
+    async def report_agent_command_result(
+        agent: Agent,
+        command_id: int,
+        result_in: AgentCommandResultRequest,
+        db: AsyncSession,
+    ) -> AgentCommand:
+        """Record command execution result submitted by the assigned agent."""
+        q = select(AgentCommand).where(AgentCommand.id == command_id)
+        cmd = (await db.execute(q)).scalar_one_or_none()
+        if not cmd or cmd.agent_id != agent.id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Command not found for this agent")
+
+        now = datetime.now(timezone.utc)
+        cmd.status = result_in.status
+        cmd.execution_result = result_in.execution_result
+        cmd.executed_at = result_in.executed_at or now
+        db.add(cmd)
+
+        # If linked to a RemediationExecution, update execution and trigger verification
+        if cmd.remediation_execution_id:
+            from backend.app.models.remediation import RemediationExecution
+            from backend.app.services.remediation_verification import RemediationVerification
+
+            q_ex = select(RemediationExecution).where(RemediationExecution.id == cmd.remediation_execution_id)
+            ex = (await db.execute(q_ex)).scalar_one_or_none()
+            if ex:
+                ex.status = result_in.status
+                if result_in.execution_result:
+                    ex.execution_log = f"{ex.execution_log or ''}\nAgent Result: {result_in.execution_result}".strip()
+                db.add(ex)
+                await db.flush()
+                if result_in.status == "succeeded":
+                    await RemediationVerification.verify_execution(ex.id, db)
+
+        db.add(AuditLog(
+            user_id=cmd.requested_by_user_id,
+            organization_id=agent.organization_id,
+            action="agent_command_executed",
+            target_resource="agent_command",
+            target_id=str(cmd.id),
+            status=result_in.status,
+            details=f"Agent {agent.agent_uuid} executed {cmd.action_name} with result {result_in.status}",
+        ))
+        await db.commit()
+        await db.refresh(cmd)
         return cmd

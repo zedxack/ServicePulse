@@ -4,7 +4,10 @@ Exports validation and serialization models for all endpoints.
 Author: Muhammadyusuf Usmonov
 """
 from backend.app.schemas.agent import (
+    AgentCommandAckResponse,
     AgentCommandRead,
+    AgentCommandResultRequest,
+    AgentCommandResultResponse,
     AgentEnrollRequest,
     AgentEnrollResponse,
     AgentHeartbeatRequest,
@@ -138,6 +141,9 @@ __all__ = [
     "AgentRead",
     "AgentTelemetryRead",
     "AgentCommandRead",
+    "AgentCommandAckResponse",
+    "AgentCommandResultRequest",
+    "AgentCommandResultResponse",
     "NetworkCheckRead",
     "DeviceMonitoringConfigRead",
     "DeviceMonitoringConfigUpdate",
