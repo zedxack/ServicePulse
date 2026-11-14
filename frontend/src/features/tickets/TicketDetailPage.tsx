@@ -7,12 +7,14 @@ import {
   ArrowLeft,
   CheckCircle2,
   MessageSquare,
-  RefreshCw,
   Send,
   UserCheck,
 } from 'lucide-react';
 import { ticketsApi } from '../../shared/api/tickets';
 import { useAuth } from '../auth/AuthContext';
+import { Badge } from '../../shared/components/Badge';
+import { Button } from '../../shared/components/Button';
+import { LoadingSkeleton } from '../../shared/components/LoadingSkeleton';
 
 export const TicketDetailPage: React.FC = () => {
   const { ticketId } = useParams<{ ticketId: string }>();
@@ -97,24 +99,25 @@ export const TicketDetailPage: React.FC = () => {
 
   if (ticketLoading) {
     return (
-      <div className="py-16 text-center text-xs text-surface-500">
-        <RefreshCw className="mx-auto h-6 w-6 animate-spin text-brand-500 mb-2" />
-        {t('dashboard.loading')}
+      <div className="space-y-6">
+        <LoadingSkeleton height="h-8" width="w-48" />
+        <LoadingSkeleton height="h-64" />
+        <LoadingSkeleton height="h-48" />
       </div>
     );
   }
 
   if (ticketError || !ticket) {
     return (
-      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
-        <AlertCircle className="mx-auto h-8 w-8 text-rose-600 mb-2" />
-        <h3 className="text-sm font-bold text-rose-900">{t('dashboard.errorLoading')}</h3>
+      <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/20 p-6 text-center">
+        <AlertCircle className="mx-auto h-8 w-8 text-rose-600 dark:text-rose-400 mb-2" />
+        <h3 className="text-sm font-bold text-rose-900 dark:text-rose-200">{t('dashboard.errorLoading')}</h3>
         <button
           onClick={() => navigate('/tickets')}
-          className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 hover:underline"
+          className="mt-4 inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:underline"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Yordam xizmatiga qaytish</span>
+          <span>Back to Helpdesk</span>
         </button>
       </div>
     );
@@ -123,69 +126,30 @@ export const TicketDetailPage: React.FC = () => {
   const getPriorityBadge = (p: string) => {
     switch (p.toLowerCase()) {
       case 'urgent':
-        return (
-          <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800">
-            {t('helpdesk.urgent')}
-          </span>
-        );
+      case 'critical':
+        return <Badge variant="offline" size="md">{t('helpdesk.urgent')}</Badge>;
       case 'high':
-        return (
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-            {t('helpdesk.high')}
-          </span>
-        );
+        return <Badge variant="warning" size="md">{t('helpdesk.high')}</Badge>;
       case 'medium':
-        return (
-          <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
-            {t('helpdesk.medium')}
-          </span>
-        );
+        return <Badge variant="brand" size="md">{t('helpdesk.medium')}</Badge>;
       default:
-        return (
-          <span className="rounded-full bg-surface-100 px-2.5 py-0.5 text-xs font-bold text-surface-700">
-            {t('helpdesk.low')}
-          </span>
-        );
+        return <Badge variant="mono" size="md">{t('helpdesk.low')}</Badge>;
     }
   };
 
   const getStatusBadge = (s: string) => {
     switch (s.toLowerCase()) {
       case 'open':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-            {t('helpdesk.open')}
-          </span>
-        );
+        return <Badge variant="offline" size="md">{t('helpdesk.open')}</Badge>;
       case 'in_progress':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-            {t('helpdesk.inProgress')}
-          </span>
-        );
+        return <Badge variant="brand" size="md">{t('helpdesk.inProgress')}</Badge>;
       case 'waiting':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-            {t('helpdesk.waiting')}
-          </span>
-        );
+        return <Badge variant="warning" size="md">{t('helpdesk.waiting')}</Badge>;
       case 'resolved':
       case 'closed':
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            {t('helpdesk.resolved')}
-          </span>
-        );
+        return <Badge variant="online" size="md">{t('helpdesk.resolved')}</Badge>;
       default:
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-surface-100 px-2.5 py-0.5 text-xs font-semibold text-surface-700">
-            {s}
-          </span>
-        );
+        return <Badge variant="mono" size="md">{s}</Badge>;
     }
   };
 
@@ -195,71 +159,77 @@ export const TicketDetailPage: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <button
           onClick={() => navigate('/tickets')}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-surface-600 hover:text-surface-900"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span>Yordam xizmatiga qaytish</span>
+          <span>Back to Helpdesk</span>
         </button>
 
         {canManage && (
           <div className="flex items-center gap-2">
             {(!ticket.assigned_to_id || ticket.assigned_to_id !== user?.id) && (
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => assignToMeMutation.mutate()}
-                disabled={assignToMeMutation.isPending}
-                className="flex items-center gap-1.5 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-semibold text-surface-700 hover:bg-surface-50"
+                isLoading={assignToMeMutation.isPending}
+                leftIcon={<UserCheck className="h-3.5 w-3.5" />}
               >
-                <UserCheck className="h-3.5 w-3.5 text-brand-600" />
-                <span>Menga biriktirish</span>
-              </button>
+                Assign to Me
+              </Button>
             )}
             {ticket.status !== 'resolved' && (
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 onClick={() => updateStatusMutation.mutate('resolved')}
-                disabled={updateStatusMutation.isPending}
-                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-emerald-700"
+                isLoading={updateStatusMutation.isPending}
+                leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
               >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span>{t('helpdesk.resolveTicket')}</span>
-              </button>
+                {t('helpdesk.resolveTicket')}
+              </Button>
             )}
           </div>
         )}
       </div>
 
       {actionError && (
-        <div className="rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700">
+        <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 p-3 text-xs font-medium text-rose-700 dark:text-rose-300">
           {actionError}
         </div>
       )}
 
       {/* Ticket Main Card */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-xs">
+      <div className="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6 shadow-xs transition-colors">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="font-mono text-xs font-bold text-surface-500">#{ticket.id}</span>
+              <span className="font-mono text-xs font-bold text-surface-500 dark:text-surface-400">
+                #{ticket.id}
+              </span>
               {getPriorityBadge(ticket.priority)}
               {getStatusBadge(ticket.status)}
-              <span className="rounded bg-surface-100 px-2 py-0.5 text-[11px] font-semibold capitalize text-surface-600">
+              <span className="rounded bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[11px] font-semibold capitalize text-surface-600 dark:text-surface-400">
                 {ticket.category}
               </span>
             </div>
-            <h1 className="text-lg font-bold text-surface-900">{ticket.title}</h1>
-            <p className="mt-2 text-xs text-surface-700 whitespace-pre-line">{ticket.description}</p>
+            <h1 className="text-xl font-bold text-surface-900 dark:text-white">{ticket.title}</h1>
+            <p className="mt-2 text-xs text-surface-700 dark:text-surface-300 whitespace-pre-line leading-relaxed">
+              {ticket.description}
+            </p>
           </div>
 
           {/* Support Quick Status Changer */}
           {canManage && (
-            <div className="flex flex-col gap-2 rounded-lg border border-surface-200 bg-surface-50 p-3 min-w-[180px]">
-              <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider">
-                Holatni o'zgartirish
+            <div className="flex flex-col gap-2 rounded-lg border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-950/50 p-3 min-w-[180px]">
+              <span className="text-[10px] font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider">
+                Status
               </span>
               <select
                 value={ticket.status}
                 onChange={(e) => updateStatusMutation.mutate(e.target.value)}
                 disabled={updateStatusMutation.isPending}
-                className="rounded-md border border-surface-300 bg-white px-2 py-1 text-xs font-medium text-surface-900 focus:outline-none"
+                className="rounded-md border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-2 py-1 text-xs font-medium text-surface-900 dark:text-white focus:outline-none"
               >
                 <option value="open">{t('helpdesk.open')}</option>
                 <option value="in_progress">{t('helpdesk.inProgress')}</option>
@@ -268,14 +238,14 @@ export const TicketDetailPage: React.FC = () => {
                 <option value="closed">{t('helpdesk.closed')}</option>
               </select>
 
-              <span className="text-[10px] font-semibold text-surface-500 uppercase tracking-wider mt-1">
-                Muhimlik
+              <span className="text-[10px] font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mt-1">
+                Priority
               </span>
               <select
                 value={ticket.priority}
                 onChange={(e) => updatePriorityMutation.mutate(e.target.value)}
                 disabled={updatePriorityMutation.isPending}
-                className="rounded-md border border-surface-300 bg-white px-2 py-1 text-xs font-medium text-surface-900 focus:outline-none"
+                className="rounded-md border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-2 py-1 text-xs font-medium text-surface-900 dark:text-white focus:outline-none"
               >
                 <option value="low">{t('helpdesk.low')}</option>
                 <option value="medium">{t('helpdesk.medium')}</option>
@@ -287,57 +257,74 @@ export const TicketDetailPage: React.FC = () => {
         </div>
 
         {/* Metadata */}
-        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-surface-100 pt-4 sm:grid-cols-4 text-xs">
+        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-surface-100 dark:border-surface-800 pt-4 sm:grid-cols-4 text-xs">
           <div>
-            <span className="text-[11px] font-medium text-surface-500">{t('helpdesk.author')}</span>
-            <p className="font-semibold text-surface-900">User #{ticket.author_id}</p>
+            <span className="text-[11px] font-medium text-surface-500 dark:text-surface-400">
+              {t('helpdesk.author')}
+            </span>
+            <p className="font-semibold text-surface-900 dark:text-white">User #{ticket.author_id}</p>
           </div>
           <div>
-            <span className="text-[11px] font-medium text-surface-500">{t('helpdesk.assignedTo')}</span>
-            <p className="font-semibold text-surface-900">
+            <span className="text-[11px] font-medium text-surface-500 dark:text-surface-400">
+              {t('helpdesk.assignedTo')}
+            </span>
+            <p className="font-semibold text-surface-900 dark:text-white">
               {ticket.assigned_to_id ? `User #${ticket.assigned_to_id}` : t('helpdesk.unassigned')}
             </p>
           </div>
           <div>
-            <span className="text-[11px] font-medium text-surface-500">Device ID</span>
-            <p className="font-mono text-surface-900">{ticket.device_id ? `#${ticket.device_id}` : '—'}</p>
+            <span className="text-[11px] font-medium text-surface-500 dark:text-surface-400">Device ID</span>
+            <p className="font-mono text-surface-900 dark:text-white">
+              {ticket.device_id ? `#${ticket.device_id}` : '—'}
+            </p>
           </div>
           <div>
-            <span className="text-[11px] font-medium text-surface-500">Yaratilgan sana</span>
-            <p className="font-medium text-surface-700">{new Date(ticket.created_at).toLocaleString()}</p>
+            <span className="text-[11px] font-medium text-surface-500 dark:text-surface-400">Created At</span>
+            <p className="font-mono text-surface-700 dark:text-surface-300">
+              {new Date(ticket.created_at).toLocaleString()}
+            </p>
           </div>
         </div>
       </div>
 
       {/* Discussion Thread */}
-      <div className="rounded-xl border border-surface-200 bg-white p-6 shadow-xs">
+      <div className="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-6 shadow-xs transition-colors">
         <div className="flex items-center gap-2 mb-4">
-          <MessageSquare className="h-4 w-4 text-brand-600" />
-          <h3 className="text-sm font-bold text-surface-900">{t('helpdesk.comments')}</h3>
+          <MessageSquare className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+          <h3 className="text-sm font-bold text-surface-900 dark:text-white">
+            {t('helpdesk.comments')}
+          </h3>
         </div>
 
         {/* Comment list */}
         <div className="space-y-4 mb-6">
           {!ticket.comments || ticket.comments.length === 0 ? (
-            <div className="py-6 text-center text-xs text-surface-500">{t('helpdesk.noComments')}</div>
+            <div className="py-6 text-center text-xs text-surface-400">{t('helpdesk.noComments')}</div>
           ) : (
             ticket.comments.map((c) => (
-              <div key={c.id} className="rounded-lg border border-surface-150 bg-surface-50/50 p-4">
+              <div
+                key={c.id}
+                className="rounded-lg border border-surface-200 dark:border-surface-800 bg-surface-50/50 dark:bg-surface-950/40 p-4"
+              >
                 <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-bold text-surface-900">User #{c.author_id}</span>
-                  <span className="text-[10px] text-surface-400">
+                  <span className="font-bold text-surface-900 dark:text-white font-mono">
+                    User #{c.author_id}
+                  </span>
+                  <span className="text-[10px] font-mono text-surface-400">
                     {new Date(c.created_at).toLocaleString()}
                   </span>
                 </div>
-                <p className="text-xs text-surface-800 whitespace-pre-line">{c.comment}</p>
+                <p className="text-xs text-surface-800 dark:text-surface-200 whitespace-pre-line">
+                  {c.comment}
+                </p>
               </div>
             ))
           )}
         </div>
 
         {/* Comment Form */}
-        <form onSubmit={handlePostComment} className="border-t border-surface-200 pt-4">
-          <label className="block text-xs font-semibold text-surface-700 mb-1">
+        <form onSubmit={handlePostComment} className="border-t border-surface-200 dark:border-surface-800 pt-4">
+          <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300 mb-1">
             {t('helpdesk.addComment')}
           </label>
           <div className="flex gap-2">
@@ -347,16 +334,18 @@ export const TicketDetailPage: React.FC = () => {
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               placeholder={t('helpdesk.commentPlaceholder')}
-              className="flex-1 rounded-lg border border-surface-300 p-2.5 text-xs text-surface-900 focus:border-brand-500 focus:outline-none"
+              className="flex-1 rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 p-2.5 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
             />
-            <button
+            <Button
               type="submit"
-              disabled={commentMutation.isPending}
-              className="self-end inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 disabled:opacity-50"
+              variant="primary"
+              size="sm"
+              className="self-end"
+              isLoading={commentMutation.isPending}
+              leftIcon={<Send className="h-3.5 w-3.5" />}
             >
-              <Send className="h-3.5 w-3.5" />
-              <span>{commentMutation.isPending ? '...' : t('helpdesk.postComment')}</span>
-            </button>
+              {t('helpdesk.postComment')}
+            </Button>
           </div>
         </form>
       </div>

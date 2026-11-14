@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Activity,
   BarChart3,
   Bell,
   Building2,
+  ChevronLeft,
   ChevronRight,
+  Command,
   HardDrive,
   LayoutDashboard,
   LifeBuoy,
@@ -15,6 +17,7 @@ import {
   Package,
   PieChart,
   Radio,
+  Search,
   Server,
   ShieldAlert,
   User as UserIcon,
@@ -23,6 +26,9 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../features/auth/AuthContext';
 import { LanguageSwitcher } from '../../shared/components/LanguageSwitcher';
+import { ThemeToggle } from '../../shared/components/ThemeToggle';
+import { PulseIndicator } from '../../shared/components/PulseIndicator';
+import { CommandPalette } from '../../shared/components/CommandPalette';
 import { getUnreadAlertCount } from '../../shared/api/alerts';
 import { useRealtimeMonitoring } from '../../features/monitoring/useRealtimeMonitoring';
 
@@ -30,10 +36,15 @@ export const AppLayout: React.FC = () => {
   const { t } = useTranslation();
   const { user, logout, hasAnyRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // Maintain real-time WebSocket connection across layout
-  useRealtimeMonitoring(Boolean(user));
+  const { status } = useRealtimeMonitoring(Boolean(user));
+  const isConnected = status === 'connected';
 
   const { data: unreadData } = useQuery({
     queryKey: ['unread-alerts-count'],
@@ -43,6 +54,18 @@ export const AppLayout: React.FC = () => {
   });
   const unreadCount = unreadData?.unread_count ?? 0;
 
+  // Global Ctrl+K / Cmd+K shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleLogout = async () => {
     await logout();
     navigate('/login', { replace: true });
@@ -51,35 +74,35 @@ export const AppLayout: React.FC = () => {
   const navItems = [
     {
       to: '/dashboard/platform',
-      label: t('nav.platformDashboard'),
+      label: t('nav.platformDashboard', 'Platform Super Admin'),
       icon: Activity,
       visible: user?.is_superuser || hasAnyRole(['platform_super_admin']),
       badge: 'Platform',
     },
     {
       to: '/dashboard/company',
-      label: t('nav.companyDashboard'),
+      label: t('nav.companyDashboard', 'Company Admin'),
       icon: Building2,
       visible: hasAnyRole(['company_admin', 'admin', 'platform_super_admin']),
       badge: 'Company',
     },
     {
       to: '/dashboard/sysadmin',
-      label: t('nav.sysadminDashboard'),
+      label: t('nav.sysadminDashboard', 'Operations Cockpit'),
       icon: HardDrive,
       visible: hasAnyRole(['it_admin', 'support', 'admin', 'company_admin', 'platform_super_admin']),
       badge: 'Ops',
     },
     {
       to: '/dashboard/executive',
-      label: t('nav.executiveDashboard'),
+      label: t('nav.executiveDashboard', 'Executive & SLA'),
       icon: PieChart,
       visible: hasAnyRole(['executive', 'admin', 'company_admin', 'platform_super_admin']),
       badge: 'SLA',
     },
     {
       to: '/dashboard/employee',
-      label: t('nav.employeeDashboard'),
+      label: t('nav.employeeDashboard', 'Employee Portal'),
       icon: UserIcon,
       visible: true,
       badge: 'Portal',
@@ -89,25 +112,25 @@ export const AppLayout: React.FC = () => {
   const operationItems = [
     {
       to: '/inventory',
-      label: t('nav.inventory'),
+      label: t('nav.inventory', 'Inventory Explorer'),
       icon: Server,
       visible: true,
     },
     {
       to: '/incidents',
-      label: t('nav.incidents'),
+      label: t('nav.incidents', 'Incident Management'),
       icon: ShieldAlert,
       visible: true,
     },
     {
       to: '/tickets',
-      label: t('nav.helpdesk'),
+      label: t('nav.helpdesk', 'Helpdesk Tickets'),
       icon: LifeBuoy,
       visible: true,
     },
     {
       to: '/software',
-      label: t('nav.software'),
+      label: t('nav.software', 'Software Approval'),
       icon: Package,
       visible: true,
     },
@@ -135,52 +158,113 @@ export const AppLayout: React.FC = () => {
     },
   ];
 
+  // Dynamic breadcrumb text
+  const getBreadcrumb = () => {
+    const path = location.pathname;
+    if (path.includes('/dashboard/platform')) return 'Platform Super Admin';
+    if (path.includes('/dashboard/company')) return 'Company Administrator';
+    if (path.includes('/dashboard/sysadmin')) return 'IT Operations Cockpit';
+    if (path.includes('/dashboard/executive')) return 'Executive & SLA Strategy';
+    if (path.includes('/dashboard/employee')) return 'Employee Self-Service Portal';
+    if (path.includes('/inventory')) return 'Inventory Explorer';
+    if (path.includes('/incidents')) return 'Incident Response & Remediation';
+    if (path.includes('/tickets')) return 'ITSM Helpdesk';
+    if (path.includes('/software')) return 'Software Governance Catalog';
+    if (path.includes('/monitoring/live')) return 'Real-Time Telemetry Fleet';
+    if (path.includes('/analytics')) return 'Availability Analytics & SLA';
+    if (path.includes('/alerts')) return 'Operations Alert Center';
+    return 'Command Center';
+  };
+
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-surface-100">
-      {/* Sidebar for Desktop */}
-      <aside className="hidden w-64 flex-col border-r border-surface-200 bg-white md:flex">
+    <div className="flex h-screen w-screen overflow-hidden bg-surface-50 text-surface-900 transition-colors duration-200 dark:bg-[#090d16] dark:text-white">
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+      />
+
+      {/* Desktop Collapsible Sidebar */}
+      <aside
+        className={`hidden flex-col border-r border-surface-200 bg-white transition-all duration-300 dark:border-white/10 dark:bg-surface-900 md:flex ${
+          isSidebarCollapsed ? 'w-16' : 'w-64'
+        }`}
+      >
         {/* Brand Header */}
-        <div className="flex h-16 items-center gap-2.5 border-b border-surface-200 px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
-            <Activity className="h-5 w-5" />
+        <div className="flex h-16 items-center justify-between border-b border-surface-200 px-4 dark:border-white/10">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 to-sky-400 text-white shadow-sm shadow-brand-500/25">
+              <Activity className="h-5 w-5" />
+              <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white bg-emerald-400 dark:border-surface-900" />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="truncate text-sm font-bold tracking-tight text-surface-900 dark:text-white">
+                    {t('app.title', 'ServicePulse')}
+                  </h1>
+                  <span className="rounded bg-brand-50 px-1 py-0.2 text-[9px] font-bold text-brand-700 ring-1 ring-brand-500/20 dark:bg-brand-950/60 dark:text-brand-300">
+                    RMM
+                  </span>
+                </div>
+                <p className="truncate text-[10px] font-medium text-surface-500 dark:text-surface-400">
+                  Command Center v1.0
+                </p>
+              </div>
+            )}
           </div>
-          <div>
-            <h1 className="text-base font-bold tracking-tight text-surface-900">{t('app.title')}</h1>
-            <p className="text-[11px] font-medium text-surface-500">v1.0.0 &bull; Enterprise</p>
-          </div>
+          <button
+            type="button"
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700 dark:hover:bg-surface-800 dark:hover:text-surface-200"
+            title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+          >
+            {isSidebarCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
         </div>
 
-        {/* Navigation Section */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+        {/* Navigation Sections */}
+        <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-5">
+          {/* Dashboards */}
           <div>
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-              {t('nav.dashboard')}
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+                {t('nav.dashboard', 'Dashboards')}
+              </div>
+            )}
             <nav className="space-y-1">
               {navItems
                 .filter((item) => item.visible)
                 .map((item) => {
                   const Icon = item.icon;
-                  const isPrimary = user?.primary_dashboard && item.to.includes(user.primary_dashboard);
+                  const isPrimary =
+                    user?.primary_dashboard && item.to.includes(user.primary_dashboard);
                   return (
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      title={isSidebarCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        `flex items-center ${
+                          isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
+                        } rounded-lg text-xs font-semibold transition-all ${
                           isActive
-                            ? 'bg-brand-50 text-brand-700 shadow-xs'
-                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            ? 'bg-brand-50 text-brand-700 shadow-xs dark:bg-brand-950/70 dark:text-brand-300 dark:ring-1 dark:ring-brand-500/30'
+                            : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800/60 dark:hover:text-white'
                         }`
                       }
                     >
                       <div className="flex items-center gap-2.5">
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
-                      {isPrimary && (
-                        <span className="rounded bg-brand-100 px-1.5 py-0.5 text-[9px] font-bold text-brand-800">
-                          {t('nav.myDashboard')}
+                      {!isSidebarCollapsed && isPrimary && (
+                        <span className="rounded bg-brand-100 px-1.5 py-0.2 text-[9px] font-bold text-brand-800 dark:bg-brand-900/60 dark:text-brand-300">
+                          {t('nav.myDashboard', 'Primary')}
                         </span>
                       )}
                     </NavLink>
@@ -189,10 +273,13 @@ export const AppLayout: React.FC = () => {
             </nav>
           </div>
 
+          {/* Operations */}
           <div>
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-              Amaliyotlar (Operations)
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+                Operations
+              </div>
+            )}
             <nav className="space-y-1">
               {operationItems
                 .filter((item) => item.visible)
@@ -202,17 +289,20 @@ export const AppLayout: React.FC = () => {
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      title={isSidebarCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        `flex items-center ${
+                          isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
+                        } rounded-lg text-xs font-semibold transition-all ${
                           isActive
-                            ? 'bg-brand-50 text-brand-700 shadow-xs'
-                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            ? 'bg-brand-50 text-brand-700 shadow-xs dark:bg-brand-950/70 dark:text-brand-300 dark:ring-1 dark:ring-brand-500/30'
+                            : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800/60 dark:hover:text-white'
                         }`
                       }
                     >
                       <div className="flex items-center gap-2.5">
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
                     </NavLink>
                   );
@@ -220,10 +310,13 @@ export const AppLayout: React.FC = () => {
             </nav>
           </div>
 
+          {/* Monitoring & Intelligence */}
           <div>
-            <div className="mb-2 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-              Monitoring & Analytics
-            </div>
+            {!isSidebarCollapsed && (
+              <div className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-wider text-surface-400 dark:text-surface-500">
+                Intelligence
+              </div>
+            )}
             <nav className="space-y-1">
               {monitoringItems
                 .filter((item) => item.visible)
@@ -233,20 +326,23 @@ export const AppLayout: React.FC = () => {
                     <NavLink
                       key={item.to}
                       to={item.to}
+                      title={isSidebarCollapsed ? item.label : undefined}
                       className={({ isActive }) =>
-                        `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                        `flex items-center ${
+                          isSidebarCollapsed ? 'justify-center px-2 py-2.5' : 'justify-between px-3 py-2'
+                        } rounded-lg text-xs font-semibold transition-all ${
                           isActive
-                            ? 'bg-brand-50 text-brand-700 shadow-xs'
-                            : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
+                            ? 'bg-brand-50 text-brand-700 shadow-xs dark:bg-brand-950/70 dark:text-brand-300 dark:ring-1 dark:ring-brand-500/30'
+                            : 'text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800/60 dark:hover:text-white'
                         }`
                       }
                     >
                       <div className="flex items-center gap-2.5">
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span>{item.label}</span>
+                        {!isSidebarCollapsed && <span className="truncate">{item.label}</span>}
                       </div>
                       {Boolean(item.badgeCount && item.badgeCount > 0) && (
-                        <span className="rounded-full bg-red-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+                        <span className="rounded-full bg-red-600 px-1.5 py-0.2 text-[10px] font-bold text-white shadow-xs">
                           {item.badgeCount}
                         </span>
                       )}
@@ -257,149 +353,108 @@ export const AppLayout: React.FC = () => {
           </div>
         </div>
 
-        {/* Footer User Info & Logout */}
-        <div className="border-t border-surface-200 p-4">
-          <div className="mb-3 flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-100 text-xs font-bold text-brand-700 ring-1 ring-surface-300">
-              {user?.full_name?.charAt(0) || 'U'}
+        {/* User Profile & Logout Footer */}
+        <div className="border-t border-surface-200 p-3 dark:border-white/10">
+          {!isSidebarCollapsed ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-100 text-xs font-bold text-brand-700 ring-1 ring-surface-300 dark:bg-surface-800 dark:text-brand-400 dark:ring-white/10">
+                  {user?.full_name?.charAt(0) || 'U'}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold text-surface-900 dark:text-white">
+                    {user?.full_name}
+                  </p>
+                  <p className="truncate text-[10px] font-mono text-surface-500 dark:text-surface-400">
+                    {user?.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-200 bg-surface-50 py-1.5 text-xs font-medium text-surface-700 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700 dark:border-white/10 dark:bg-surface-800 dark:text-surface-300 dark:hover:border-red-900 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>{t('nav.logout', 'Sign Out')}</span>
+              </button>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-surface-900">{user?.full_name}</p>
-              <p className="truncate text-[11px] text-surface-500">{user?.email}</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-200 bg-surface-50 py-1.5 text-xs font-medium text-surface-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span>{t('nav.logout')}</span>
-          </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLogout}
+              title={t('nav.logout', 'Sign Out')}
+              className="flex h-9 w-full items-center justify-center rounded-lg text-surface-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Drawer Overlay */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-black/40" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative flex w-64 max-w-[80%] flex-col bg-white shadow-xl">
-            <div className="flex h-16 items-center justify-between border-b border-surface-200 px-4">
-              <div className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-brand-600" />
-                <span className="font-bold text-surface-900">{t('app.title')}</span>
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="relative flex w-72 max-w-[85%] flex-col bg-white shadow-2xl dark:bg-surface-900">
+            <div className="flex h-16 items-center justify-between border-b border-surface-200 px-4 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-brand-600 to-sky-400 text-white shadow-xs">
+                  <Activity className="h-4 w-4" />
+                </div>
+                <span className="font-bold text-surface-900 dark:text-white">
+                  {t('app.title', 'ServicePulse')}
+                </span>
               </div>
               <button
+                type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                className="rounded-md p-1.5 text-surface-500 hover:bg-surface-100"
+                className="rounded-lg p-1.5 text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-800"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div>
-                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-                  {t('nav.dashboard')}
-                </div>
-                <nav className="space-y-1">
-                  {navItems
-                    .filter((item) => item.visible)
-                    .map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={({ isActive }) =>
-                            `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${
-                              isActive
-                                ? 'bg-brand-50 text-brand-700'
-                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
-                            }`
-                          }
-                        >
+
+            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+              <nav className="space-y-1">
+                {[...navItems.filter((i) => i.visible), ...operationItems, ...monitoringItems].map(
+                  (item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold ${
+                            isActive
+                              ? 'bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300'
+                              : 'text-surface-600 hover:bg-surface-50 dark:text-surface-400 dark:hover:bg-surface-800/60'
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-2.5">
                           <Icon className="h-4 w-4" />
                           <span>{item.label}</span>
-                        </NavLink>
-                      );
-                    })}
-                </nav>
-              </div>
-
-              <div>
-                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-                  Amaliyotlar
-                </div>
-                <nav className="space-y-1">
-                  {operationItems
-                    .filter((item) => item.visible)
-                    .map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={({ isActive }) =>
-                            `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs font-semibold ${
-                              isActive
-                                ? 'bg-brand-50 text-brand-700'
-                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
-                            }`
-                          }
-                        >
-                          <Icon className="h-4 w-4" />
-                          <span>{item.label}</span>
-                        </NavLink>
-                      );
-                    })}
-                </nav>
-              </div>
-
-              <div>
-                <div className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-surface-400">
-                  Monitoring & Analytics
-                </div>
-                <nav className="space-y-1">
-                  {monitoringItems
-                    .filter((item) => item.visible)
-                    .map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={({ isActive }) =>
-                            `flex items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold ${
-                              isActive
-                                ? 'bg-brand-50 text-brand-700'
-                                : 'text-surface-600 hover:bg-surface-50 hover:text-surface-900'
-                            }`
-                          }
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <Icon className="h-4 w-4" />
-                            <span>{item.label}</span>
-                          </div>
-                          {Boolean(item.badgeCount && item.badgeCount > 0) && (
-                            <span className="rounded-full bg-red-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
-                              {item.badgeCount}
-                            </span>
-                          )}
-                        </NavLink>
-                      );
-                    })}
-                </nav>
-              </div>
+                        </div>
+                      </NavLink>
+                    );
+                  }
+                )}
+              </nav>
             </div>
-            <div className="border-t border-surface-200 p-4">
+
+            <div className="border-t border-surface-200 p-3 dark:border-white/10">
               <button
+                type="button"
                 onClick={handleLogout}
-                className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-200 bg-surface-50 py-2 text-xs font-medium text-surface-700"
+                className="flex w-full items-center justify-center gap-2 rounded-lg border border-surface-200 bg-surface-50 py-2 text-xs font-medium text-surface-700 dark:border-white/10 dark:bg-surface-800 dark:text-surface-300"
               >
                 <LogOut className="h-4 w-4" />
-                <span>{t('nav.logout')}</span>
+                <span>{t('nav.logout', 'Sign Out')}</span>
               </button>
             </div>
           </div>
@@ -408,50 +463,84 @@ export const AppLayout: React.FC = () => {
 
       {/* Main Content Viewport */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Header */}
-        <header className="flex h-16 items-center justify-between border-b border-surface-200 bg-white px-6">
+        {/* Top Header Command Bar */}
+        <header className="flex h-16 items-center justify-between border-b border-surface-200 bg-white/80 px-4 md:px-6 backdrop-blur-md dark:border-white/10 dark:bg-surface-900/80">
+          {/* Left: Mobile hamburger + Contextual Breadcrumbs */}
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="rounded-lg p-2 text-surface-600 hover:bg-surface-100 md:hidden"
+              className="rounded-lg p-2 text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800 md:hidden"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="hidden sm:flex items-center gap-2 text-xs text-surface-500">
-              <LayoutDashboard className="h-4 w-4 text-surface-400" />
-              <span>{t('nav.dashboard')}</span>
-              <ChevronRight className="h-3.5 w-3.5 text-surface-300" />
-              <span className="font-semibold text-surface-800">
-                {user?.roles?.map((r) => r.name).join(', ') || 'User'}
+            <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
+              <LayoutDashboard className="h-4 w-4 text-surface-400 dark:text-surface-500" />
+              <span className="hidden sm:inline">{t('nav.dashboard', 'Operations')}</span>
+              <ChevronRight className="h-3.5 w-3.5 text-surface-300 dark:text-surface-600" />
+              <span className="font-semibold text-surface-900 dark:text-white">
+                {getBreadcrumb()}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Center: Command Palette Trigger Button */}
+          <div className="hidden lg:flex items-center">
+            <button
+              type="button"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="flex items-center gap-2.5 rounded-lg border border-surface-200 bg-surface-50 px-3 py-1.5 text-xs text-surface-500 transition-colors hover:border-surface-300 hover:text-surface-700 dark:border-white/10 dark:bg-surface-800/60 dark:text-surface-400 dark:hover:border-white/20 dark:hover:text-surface-200"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span>Search commands, devices...</span>
+              <kbd className="flex items-center gap-0.5 rounded border border-surface-200 bg-white px-1.5 py-0.2 text-[10px] font-mono font-medium text-surface-500 dark:border-white/10 dark:bg-surface-900 dark:text-surface-400">
+                <Command className="h-3 w-3" />K
+              </kbd>
+            </button>
+          </div>
+
+          {/* Right: Controls & Status Indicators */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            {/* Live WebSocket Status Pill */}
+            <div
+              className="hidden sm:flex items-center gap-1.5 rounded-full border border-surface-200 bg-surface-50 px-2.5 py-1 text-[11px] font-medium text-surface-700 dark:border-white/10 dark:bg-surface-800/60 dark:text-surface-300"
+              title={isConnected ? 'Real-Time WebSocket Feed Connected' : 'WebSocket Reconnecting...'}
+            >
+              <PulseIndicator status={isConnected ? 'online' : 'warning'} size="sm" ping={isConnected} />
+              <span className="font-mono">{isConnected ? 'LIVE' : 'SYNCING'}</span>
+            </div>
+
+            {/* Organization Tag */}
             {user?.organization_id && (
-              <div className="hidden lg:flex items-center gap-1.5 rounded-full bg-surface-100 px-3 py-1 text-xs font-medium text-surface-700">
+              <div className="hidden md:flex items-center gap-1.5 rounded-full border border-surface-200 bg-surface-100/60 px-2.5 py-1 text-[11px] font-medium text-surface-700 dark:border-white/10 dark:bg-surface-800/60 dark:text-surface-300">
                 <Building2 className="h-3.5 w-3.5 text-surface-500" />
-                <span>Org #{user.organization_id}</span>
+                <span className="font-mono">Org #{user.organization_id}</span>
               </div>
             )}
+
+            {/* Alert Center Trigger */}
             <button
+              type="button"
               onClick={() => navigate('/alerts')}
-              className="relative p-2 rounded-lg text-surface-600 hover:bg-surface-100 hover:text-surface-900 transition"
+              className="relative rounded-lg p-2 text-surface-600 transition-colors hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-white"
               title={t('nav.alerts', 'Alert Center')}
             >
-              <Bell className="h-5 w-5" />
+              <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+                <span className="absolute top-1.5 right-1.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white shadow-xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
             </button>
+
+            {/* Theme & Language Selectors */}
+            <ThemeToggle />
             <LanguageSwitcher />
           </div>
         </header>
 
-        {/* Main Body */}
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        {/* Main Scrollable Viewport */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>

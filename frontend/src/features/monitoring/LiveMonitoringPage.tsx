@@ -23,6 +23,12 @@ import {
 import { useRealtimeMonitoring } from './useRealtimeMonitoring';
 import { inventoryApi } from '../../shared/api/inventory';
 import { WSMessage } from '../../shared/types/ws';
+import { MetricCard } from '../../shared/components/MetricCard';
+import { Badge } from '../../shared/components/Badge';
+import { Button } from '../../shared/components/Button';
+import { EmptyState } from '../../shared/components/EmptyState';
+import { LoadingSkeleton } from '../../shared/components/LoadingSkeleton';
+import { PulseIndicator } from '../../shared/components/PulseIndicator';
 
 export const LiveMonitoringPage: React.FC = () => {
   const { t } = useTranslation();
@@ -65,13 +71,18 @@ export const LiveMonitoringPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Radio className="w-7 h-7 text-primary-600 animate-pulse" />
-            {t('monitoring.live_title', 'Live Fleet Monitoring')}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center gap-2">
+            <Radio className="h-6 w-6 text-brand-600 dark:text-brand-400 animate-pulse" />
+            <h1 className="text-2xl font-bold tracking-tight text-surface-900 dark:text-white">
+              {t('monitoring.live_title', 'Live Fleet Monitoring')}
+            </h1>
+            <span className="rounded-md border border-brand-500/20 bg-brand-500/10 px-2 py-0.5 text-[11px] font-semibold text-brand-600 dark:text-brand-400">
+              Realtime Stream
+            </span>
+          </div>
+          <p className="text-xs text-surface-500 dark:text-surface-400">
             {t(
               'monitoring.live_subtitle',
               'Real-time WebSocket telemetry stream and operational event bus'
@@ -79,151 +90,118 @@ export const LiveMonitoringPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Connection status indicator */}
+        {/* Connection status indicator & refresh */}
         <div className="flex items-center gap-3">
-          <div
-            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold ${
-              status === 'connected'
-                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                : status === 'connecting'
-                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-                : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-            }`}
-          >
-            <span
-              className={`w-2.5 h-2.5 rounded-full ${
+          <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 px-3 py-1.5 text-xs font-semibold shadow-xs">
+            <PulseIndicator
+              status={
                 status === 'connected'
-                  ? 'bg-green-500 animate-ping'
+                  ? 'online'
                   : status === 'connecting'
-                  ? 'bg-amber-500 animate-pulse'
-                  : 'bg-red-500'
-              }`}
+                  ? 'warning'
+                  : 'offline'
+              }
+              size="sm"
             />
-            {status === 'connected' && t('monitoring.status_connected', 'Connected (Live)')}
-            {status === 'connecting' && t('monitoring.status_connecting', 'Connecting...')}
-            {status === 'disconnected' && t('monitoring.status_disconnected', 'Disconnected')}
-            {status === 'error' && t('monitoring.status_error', 'Connection Error')}
+            <span className="text-surface-700 dark:text-surface-200">
+              {status === 'connected' && t('monitoring.status_connected', 'Connected (Live)')}
+              {status === 'connecting' && t('monitoring.status_connecting', 'Connecting...')}
+              {status === 'disconnected' && t('monitoring.status_disconnected', 'Disconnected')}
+              {status === 'error' && t('monitoring.status_error', 'Connection Error')}
+            </span>
           </div>
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => {
               reconnect();
               refetchDevices();
             }}
-            className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            title={t('common.refresh', 'Refresh')}
+            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+            {t('common.refresh', 'Refresh')}
+          </Button>
         </div>
       </div>
 
       {/* KPI Counters */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400">
-            <Server className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {devices.length}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('monitoring.total_devices', 'Monitored Devices')}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-green-50 dark:bg-green-900/30 rounded-lg text-green-600 dark:text-green-400">
-            <Wifi className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-              {onlineCount}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('monitoring.online_devices', 'Online')}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-red-50 dark:bg-red-900/30 rounded-lg text-red-600 dark:text-red-400">
-            <WifiOff className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-              {offlineCount}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('monitoring.offline_devices', 'Offline')}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-3">
-          <div className="p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
-            <Activity className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {events.length}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {t('monitoring.live_events', 'Buffered Events')}
-            </div>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <MetricCard
+          title={t('monitoring.total_devices', 'Monitored Devices')}
+          value={devices.length}
+          subtitle="Inventory endpoints"
+          icon={<Server className="h-4 w-4" />}
+          accentColor="brand"
+        />
+        <MetricCard
+          title={t('monitoring.online_devices', 'Online')}
+          value={onlineCount}
+          subtitle="Active pulse received"
+          icon={<Wifi className="h-4 w-4" />}
+          accentColor="emerald"
+        />
+        <MetricCard
+          title={t('monitoring.offline_devices', 'Offline')}
+          value={offlineCount}
+          subtitle="Heartbeat lost"
+          icon={<WifiOff className="h-4 w-4" />}
+          accentColor={offlineCount > 0 ? 'rose' : 'mono'}
+        />
+        <MetricCard
+          title={t('monitoring.live_events', 'Buffered Events')}
+          value={events.length}
+          subtitle="In-memory stream"
+          icon={<Activity className="h-4 w-4" />}
+          accentColor="purple"
+        />
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
-        <div className="flex gap-4">
+      <div className="flex flex-col gap-3 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-3 shadow-xs transition-colors sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-1 rounded-lg border border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-950/60 p-1 text-xs font-semibold">
           <button
             onClick={() => setActiveTab('telemetry')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition ${
               activeTab === 'telemetry'
-                ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white'
             }`}
           >
-            <Cpu className="w-4 h-4" />
-            {t('monitoring.fleet_telemetry', 'Live Fleet Telemetry')} ({devices.length})
+            <Cpu className="h-3.5 w-3.5" />
+            <span>{t('monitoring.fleet_telemetry', 'Live Fleet Telemetry')} ({devices.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('events')}
-            className={`pb-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 ${
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition ${
               activeTab === 'events'
-                ? 'border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-white'
             }`}
           >
-            <Activity className="w-4 h-4" />
-            {t('monitoring.live_event_bus', 'Live Event Stream')} ({events.length})
+            <Activity className="h-3.5 w-3.5" />
+            <span>{t('monitoring.live_event_bus', 'Live Event Stream')} ({events.length})</span>
           </button>
         </div>
 
         {activeTab === 'events' && (
-          <div className="flex items-center gap-2 pb-2">
-            <button
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isPaused ? 'secondary' : 'ghost'}
+              size="sm"
               onClick={() => setIsPaused(!isPaused)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium border ${
-                isPaused
-                  ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300'
-                  : 'bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300'
-              }`}
+              leftIcon={isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
             >
-              {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
               {isPaused ? t('monitoring.resume', 'Resume') : t('monitoring.pause', 'Pause')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={clearEvents}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium text-gray-600 border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+              leftIcon={<Trash2 className="h-3.5 w-3.5" />}
             >
-              <Trash2 className="w-3.5 h-3.5" />
               {t('common.clear', 'Clear')}
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -232,16 +210,18 @@ export const LiveMonitoringPage: React.FC = () => {
       {activeTab === 'telemetry' && (
         <div className="space-y-4">
           {isDevicesLoading ? (
-            <div className="p-8 text-center text-gray-500">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-primary-500" />
-              {t('common.loading', 'Loading fleet devices...')}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <LoadingSkeleton height="h-48" />
+              <LoadingSkeleton height="h-48" />
+              <LoadingSkeleton height="h-48" />
             </div>
           ) : devices.length === 0 ? (
-            <div className="p-12 text-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-              <Server className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">
-                {t('monitoring.no_devices', 'No monitored devices found.')}
-              </p>
+            <div className="py-12">
+              <EmptyState
+                icon={<Server className="h-8 w-8" />}
+                title={t('monitoring.no_devices', 'No monitored devices found.')}
+                description="Add devices to your inventory to start streaming real-time telemetry."
+              />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -255,51 +235,52 @@ export const LiveMonitoringPage: React.FC = () => {
                 return (
                   <div
                     key={device.id}
-                    className="bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 shadow-sm hover:border-primary-500 transition-colors"
+                    className="rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-5 shadow-xs hover:border-brand-400 dark:hover:border-brand-500 transition-colors"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                          <Server className="w-4 h-4 text-gray-500" />
-                          {device.name}
+                        <div className="font-semibold text-surface-900 dark:text-white flex items-center gap-2">
+                          <Server className="h-4 w-4 text-surface-400" />
+                          <span>{device.name}</span>
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {device.ip_address} &bull; {device.device_type}
+                        <div className="text-xs font-mono text-surface-500 dark:text-surface-400 mt-0.5">
+                          {device.ip_address} &bull; <span className="capitalize">{device.device_type}</span>
                         </div>
                       </div>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                      <Badge
+                        variant={
                           device.status === 'online'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                            ? 'online'
                             : device.status === 'warning'
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                        }`}
+                            ? 'warning'
+                            : 'offline'
+                        }
+                        size="sm"
                       >
-                        {device.status.toUpperCase()}
-                      </span>
+                        {device.status}
+                      </Badge>
                     </div>
 
                     {/* Live Telemetry Progress Bars */}
-                    <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700 text-xs">
+                    <div className="space-y-3 pt-3 border-t border-surface-100 dark:border-surface-800 text-xs">
                       {/* CPU */}
                       <div>
-                        <div className="flex justify-between text-gray-600 dark:text-gray-400 mb-1">
-                          <span className="flex items-center gap-1">
-                            <Cpu className="w-3.5 h-3.5" /> CPU
+                        <div className="flex justify-between text-surface-600 dark:text-surface-400 mb-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Cpu className="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" /> CPU
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-mono font-bold text-surface-900 dark:text-white">
                             {cpu !== null ? `${cpu.toFixed(1)}%` : '—'}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-surface-100 dark:bg-surface-800 h-2 rounded-full overflow-hidden">
                           <div
                             className={`h-full transition-all duration-500 ${
-                              cpu && cpu > 85
-                                ? 'bg-red-500'
-                                : cpu && cpu > 70
+                              cpu && cpu >= 90
+                                ? 'bg-rose-500'
+                                : cpu && cpu >= 75
                                 ? 'bg-amber-500'
-                                : 'bg-primary-600'
+                                : 'bg-brand-500'
                             }`}
                             style={{ width: `${Math.min(cpu ?? 0, 100)}%` }}
                           />
@@ -308,20 +289,20 @@ export const LiveMonitoringPage: React.FC = () => {
 
                       {/* RAM */}
                       <div>
-                        <div className="flex justify-between text-gray-600 dark:text-gray-400 mb-1">
-                          <span className="flex items-center gap-1">
-                            <Activity className="w-3.5 h-3.5" /> RAM
+                        <div className="flex justify-between text-surface-600 dark:text-surface-400 mb-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <Activity className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" /> RAM
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-mono font-bold text-surface-900 dark:text-white">
                             {ram !== null ? `${ram.toFixed(1)}%` : '—'}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-surface-100 dark:bg-surface-800 h-2 rounded-full overflow-hidden">
                           <div
                             className={`h-full transition-all duration-500 ${
-                              ram && ram > 90
-                                ? 'bg-red-500'
-                                : ram && ram > 75
+                              ram && ram >= 90
+                                ? 'bg-rose-500'
+                                : ram && ram >= 75
                                 ? 'bg-amber-500'
                                 : 'bg-emerald-500'
                             }`}
@@ -332,29 +313,29 @@ export const LiveMonitoringPage: React.FC = () => {
 
                       {/* Disk */}
                       <div>
-                        <div className="flex justify-between text-gray-600 dark:text-gray-400 mb-1">
-                          <span className="flex items-center gap-1">
-                            <HardDrive className="w-3.5 h-3.5" /> Disk
+                        <div className="flex justify-between text-surface-600 dark:text-surface-400 mb-1">
+                          <span className="flex items-center gap-1 font-medium">
+                            <HardDrive className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> Disk
                           </span>
-                          <span className="font-semibold">
+                          <span className="font-mono font-bold text-surface-900 dark:text-white">
                             {disk !== null ? `${disk.toFixed(1)}%` : '—'}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-100 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                        <div className="w-full bg-surface-100 dark:bg-surface-800 h-2 rounded-full overflow-hidden">
                           <div
-                            className="bg-indigo-500 h-full transition-all duration-500"
+                            className="bg-slate-500 dark:bg-slate-400 h-full transition-all duration-500"
                             style={{ width: `${Math.min(disk ?? 0, 100)}%` }}
                           />
                         </div>
                       </div>
 
                       {/* Defender & Telemetry Timestamp */}
-                      <div className="flex items-center justify-between pt-1 text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center justify-between pt-1 text-[11px] text-surface-500 dark:text-surface-400">
                         <span className="flex items-center gap-1">
-                          <Shield className="w-3.5 h-3.5 text-blue-500" />
-                          {defender || 'Defender'}
+                          <Shield className="h-3.5 w-3.5 text-brand-500" />
+                          <span>{defender || 'Defender'}</span>
                         </span>
-                        <span>
+                        <span className="font-mono">
                           {liveTel?.recorded_at
                             ? new Date(liveTel.recorded_at).toLocaleTimeString()
                             : device.last_seen
@@ -388,8 +369,8 @@ export const LiveMonitoringPage: React.FC = () => {
                 onClick={() => setFilterType(f.id)}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                   filterType === f.id
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-white dark:bg-surface-900 text-surface-700 dark:text-surface-300 border border-surface-200 dark:border-surface-800 hover:bg-surface-50 dark:hover:bg-surface-800'
                 }`}
               >
                 {f.label}
@@ -398,10 +379,10 @@ export const LiveMonitoringPage: React.FC = () => {
           </div>
 
           {/* Event Stream Log */}
-          <div className="bg-gray-900 text-gray-100 rounded-xl p-4 font-mono text-xs shadow-inner min-h-[420px] max-h-[600px] overflow-y-auto space-y-2">
+          <div className="bg-surface-950 text-surface-100 rounded-xl p-4 font-mono text-xs shadow-inner min-h-[420px] max-h-[600px] overflow-y-auto space-y-2 border border-surface-800">
             {filteredEvents.length === 0 ? (
-              <div className="text-gray-500 text-center py-16">
-                <Activity className="w-8 h-8 mx-auto mb-2 text-gray-600 animate-pulse" />
+              <div className="text-surface-500 text-center py-16">
+                <Activity className="w-8 h-8 mx-auto mb-2 text-surface-600 animate-pulse" />
                 {t('monitoring.awaiting_events', 'Listening for real-time WebSocket events...')}
               </div>
             ) : (
@@ -414,26 +395,26 @@ export const LiveMonitoringPage: React.FC = () => {
                 return (
                   <div
                     key={`${ev.timestamp}-${idx}`}
-                    className="p-2.5 rounded bg-gray-800/80 border border-gray-700/60 hover:border-gray-600 transition-colors"
+                    className="p-3 rounded-lg bg-surface-900/90 border border-surface-800 hover:border-surface-700 transition-colors"
                   >
-                    <div className="flex items-center justify-between text-gray-400 mb-1">
+                    <div className="flex items-center justify-between text-surface-400 mb-1">
                       <div className="flex items-center gap-2">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                             isIncident
-                              ? 'bg-red-900/60 text-red-300 border border-red-700'
+                              ? 'bg-rose-950 text-rose-300 border border-rose-800'
                               : isAlert
-                              ? 'bg-amber-900/60 text-amber-300 border border-amber-700'
+                              ? 'bg-amber-950 text-amber-300 border border-amber-800'
                               : isRemediation
-                              ? 'bg-purple-900/60 text-purple-300 border border-purple-700'
+                              ? 'bg-purple-950 text-purple-300 border border-purple-800'
                               : isStatus
-                              ? 'bg-blue-900/60 text-blue-300 border border-blue-700'
-                              : 'bg-gray-700 text-gray-300'
+                              ? 'bg-blue-950 text-blue-300 border border-blue-800'
+                              : 'bg-surface-800 text-surface-300'
                           }`}
                         >
                           {ev.type}
                         </span>
-                        <span className="text-gray-300 font-semibold">
+                        <span className="text-surface-200 font-semibold">
                           {typeof ev.payload === 'object' && ev.payload !== null
                             ? String(
                                 (ev.payload as Record<string, unknown>).title ||
@@ -444,11 +425,11 @@ export const LiveMonitoringPage: React.FC = () => {
                             : String(ev.payload)}
                         </span>
                       </div>
-                      <span className="text-gray-500">
+                      <span className="text-surface-500 text-[11px]">
                         {new Date(ev.timestamp).toLocaleTimeString()}
                       </span>
                     </div>
-                    <pre className="text-gray-300 text-[11px] overflow-x-auto p-1 bg-black/40 rounded mt-1">
+                    <pre className="text-surface-300 text-[11px] overflow-x-auto p-2 bg-black/50 rounded mt-1 border border-surface-800/60">
                       {JSON.stringify(ev.payload, null, 2)}
                     </pre>
                   </div>

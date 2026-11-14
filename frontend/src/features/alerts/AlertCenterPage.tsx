@@ -8,15 +8,11 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
-  AlertCircle,
-  AlertOctagon,
-  AlertTriangle,
   Bell,
   BellOff,
   Check,
   CheckCheck,
   ExternalLink,
-  Info,
   RefreshCw,
 } from 'lucide-react';
 import {
@@ -25,6 +21,10 @@ import {
   markAllAlertsRead,
 } from '../../shared/api/alerts';
 import { AlertSeverity, InAppNotification } from '../../shared/types/alert';
+import { Badge } from '../../shared/components/Badge';
+import { Button } from '../../shared/components/Button';
+import { EmptyState } from '../../shared/components/EmptyState';
+import { LoadingSkeleton } from '../../shared/components/LoadingSkeleton';
 
 export const AlertCenterPage: React.FC = () => {
   const { t } = useTranslation();
@@ -72,52 +72,33 @@ export const AlertCenterPage: React.FC = () => {
   const getSeverityBadge = (severity: AlertSeverity) => {
     switch (severity) {
       case 'critical':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
-            <AlertOctagon className="w-3.5 h-3.5" />
-            CRITICAL
-          </span>
-        );
       case 'error':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300">
-            <AlertCircle className="w-3.5 h-3.5" />
-            ERROR
-          </span>
-        );
+        return <Badge variant="offline" size="sm">{severity.toUpperCase()}</Badge>;
       case 'warning':
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            WARNING
-          </span>
-        );
+        return <Badge variant="warning" size="sm">WARNING</Badge>;
       case 'info':
       default:
-        return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
-            <Info className="w-3.5 h-3.5" />
-            INFO
-          </span>
-        );
+        return <Badge variant="info" size="sm">INFO</Badge>;
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Bell className="w-7 h-7 text-primary-600" />
-            {t('alerts.center_title', 'Alert & Notification Center')}
+          <div className="flex items-center gap-2">
+            <Bell className="h-6 w-6 text-brand-600 dark:text-brand-400" />
+            <h1 className="text-2xl font-bold tracking-tight text-surface-900 dark:text-white">
+              {t('alerts.center_title', 'Alert & Notification Center')}
+            </h1>
             {unreadCount > 0 && (
-              <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-red-600 text-white">
+              <span className="rounded-full bg-rose-500 px-2.5 py-0.5 text-xs font-bold text-white shadow-xs">
                 {unreadCount} {t('alerts.unread', 'unread')}
               </span>
             )}
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
+          </div>
+          <p className="text-xs text-surface-500 dark:text-surface-400">
             {t(
               'alerts.center_subtitle',
               'Persistent in-app operational notifications, threshold alerts, and lifecycle changes'
@@ -128,36 +109,38 @@ export const AlertCenterPage: React.FC = () => {
         {/* Actions */}
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
-            <button
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => markAllMutation.mutate()}
-              disabled={markAllMutation.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+              isLoading={markAllMutation.isPending}
+              leftIcon={<CheckCheck className="h-3.5 w-3.5" />}
             >
-              <CheckCheck className="w-4 h-4" />
               {t('alerts.mark_all_read', 'Mark all as read')}
-            </button>
+            </Button>
           )}
 
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => refetch()}
-            className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-            title={t('common.refresh', 'Refresh')}
+            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            <RefreshCw className="w-4 h-4" />
-          </button>
+            {t('common.refresh', 'Refresh')}
+          </Button>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700 shadow-sm flex flex-wrap items-center justify-between gap-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 p-3 shadow-xs transition-colors text-xs">
         <div className="flex flex-wrap items-center gap-3">
           {/* Unread toggle */}
           <button
             onClick={() => setUnreadOnly(!unreadOnly)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+            className={`rounded-lg px-3 py-1.5 font-semibold border transition-colors ${
               unreadOnly
-                ? 'bg-primary-50 text-primary-700 border-primary-300 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-700'
-                : 'bg-gray-50 text-gray-700 border-gray-300 dark:bg-gray-750 dark:text-gray-300 dark:border-gray-600'
+                ? 'bg-brand-500/10 text-brand-700 dark:text-brand-300 border-brand-500/30'
+                : 'bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 border-surface-200 dark:border-surface-700 hover:bg-surface-100 dark:hover:bg-surface-700'
             }`}
           >
             {unreadOnly
@@ -166,12 +149,14 @@ export const AlertCenterPage: React.FC = () => {
           </button>
 
           {/* Severity filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500">{t('alerts.severity', 'Severity')}:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-surface-500 dark:text-surface-400 font-medium">
+              {t('alerts.severity', 'Severity')}:
+            </span>
             <select
               value={selectedSeverity}
               onChange={(e) => setSelectedSeverity(e.target.value)}
-              className="text-xs border border-gray-300 dark:border-gray-600 rounded-md p-1.5 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+              className="rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-2.5 py-1 text-surface-800 dark:text-surface-200 focus:outline-none"
             >
               <option value="all">{t('common.all', 'All')}</option>
               <option value="critical">Critical</option>
@@ -182,12 +167,14 @@ export const AlertCenterPage: React.FC = () => {
           </div>
 
           {/* Category filter */}
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500">{t('alerts.category', 'Category')}:</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-surface-500 dark:text-surface-400 font-medium">
+              {t('alerts.category', 'Category')}:
+            </span>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="text-xs border border-gray-300 dark:border-gray-600 rounded-md p-1.5 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+              className="rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-2.5 py-1 text-surface-800 dark:text-surface-200 focus:outline-none"
             >
               <option value="all">{t('common.all', 'All')}</option>
               <option value="device">Device</option>
@@ -199,26 +186,25 @@ export const AlertCenterPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="text-xs text-gray-500">
+        <div className="text-surface-400 font-mono text-[11px]">
           {t('alerts.showing_count', 'Showing {{count}} alerts', { count: notifications.length })}
         </div>
       </div>
 
       {/* Alert Cards List */}
       {isLoading ? (
-        <div className="p-12 text-center text-gray-500">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-primary-500" />
-          {t('common.loading', 'Loading alerts...')}
+        <div className="space-y-3">
+          <LoadingSkeleton height="h-20" />
+          <LoadingSkeleton height="h-20" />
+          <LoadingSkeleton height="h-20" />
         </div>
       ) : notifications.length === 0 ? (
-        <div className="p-16 text-center bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <BellOff className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-            {t('alerts.no_alerts_found', 'No notifications matching your filter')}
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            {t('alerts.all_clear', 'All clear. You have zero unread alerts in this view.')}
-          </p>
+        <div className="py-12">
+          <EmptyState
+            icon={<BellOff className="h-8 w-8" />}
+            title={t('alerts.no_alerts_found', 'No notifications matching your filter')}
+            description={t('alerts.all_clear', 'All clear. You have zero unread alerts in this view.')}
+          />
         </div>
       ) : (
         <div className="space-y-3">
@@ -229,37 +215,34 @@ export const AlertCenterPage: React.FC = () => {
             return (
               <div
                 key={notif.id}
-                className={`p-4 rounded-xl border transition-colors ${
+                className={`rounded-xl border p-4 transition-colors ${
                   !notif.is_read
-                    ? 'bg-blue-50/40 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/60 shadow-sm'
-                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                    ? 'border-brand-500/30 bg-brand-500/5 dark:bg-brand-950/20 shadow-xs'
+                    : 'border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900'
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div className="flex items-start gap-3 flex-1">
                     {/* Unread indicator */}
-                    <div className="pt-1 flex-shrink-0">
+                    <div className="pt-1.5 flex-shrink-0">
                       {!notif.is_read ? (
-                        <span
-                          className="w-2.5 h-2.5 rounded-full bg-blue-600 block"
-                          title="Unread"
-                        />
+                        <span className="block h-2.5 w-2.5 rounded-full bg-brand-500 animate-pulse" />
                       ) : (
-                        <span className="w-2.5 h-2.5 rounded-full bg-transparent block" />
+                        <span className="block h-2.5 w-2.5 rounded-full bg-surface-300 dark:bg-surface-700" />
                       )}
                     </div>
 
                     <div className="space-y-1 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         {getSeverityBadge(notif.severity)}
-                        <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 uppercase">
+                        <span className="rounded bg-surface-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase text-surface-600 dark:text-surface-400">
                           {notif.category}
                         </span>
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                        <h4 className="text-xs font-bold text-surface-900 dark:text-white">
                           {notif.title}
                         </h4>
                       </div>
-                      <p className="text-xs text-gray-600 dark:text-gray-300">
+                      <p className="text-xs text-surface-600 dark:text-surface-300">
                         {notif.message}
                       </p>
 
@@ -268,7 +251,7 @@ export const AlertCenterPage: React.FC = () => {
                         {incidentId && (
                           <button
                             onClick={() => navigate(`/incidents`)}
-                            className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium"
+                            className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             {t('alerts.view_incident', 'View Incident #{{id}}', { id: incidentId })}
@@ -277,7 +260,7 @@ export const AlertCenterPage: React.FC = () => {
                         {deviceId && (
                           <button
                             onClick={() => navigate(`/inventory`)}
-                            className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 dark:text-primary-400 font-medium"
+                            className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             {t('alerts.view_device', 'View Device #{{id}}', { id: deviceId })}
@@ -288,18 +271,19 @@ export const AlertCenterPage: React.FC = () => {
                   </div>
 
                   {/* Timestamp & Mark Read */}
-                  <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 text-xs text-gray-400 flex-shrink-0">
-                    <span>{new Date(notif.created_at).toLocaleString()}</span>
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 text-xs text-surface-400 flex-shrink-0">
+                    <span className="font-mono text-[11px]">{new Date(notif.created_at).toLocaleString()}</span>
                     {!notif.is_read && (
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => markReadMutation.mutate(notif.id)}
-                        disabled={markReadMutation.isPending}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-600"
+                        isLoading={markReadMutation.isPending}
                         title={t('alerts.mark_read', 'Mark as read')}
+                        leftIcon={<Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />}
                       >
-                        <Check className="w-3 h-3 text-green-600" />
                         {t('alerts.mark_read', 'Mark as read')}
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>

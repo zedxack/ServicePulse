@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, X } from 'lucide-react';
 import { inventoryApi } from '../../shared/api/inventory';
 import { BuildingRead } from '../../shared/types/inventory';
+import { Button } from '../../shared/components/Button';
 
 interface CreateLocationModalProps {
   buildings: BuildingRead[];
@@ -140,27 +141,35 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
     createDeviceMutation.isPending;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-surface-200 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+      <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-surface-200 dark:border-surface-800 bg-white dark:bg-surface-900 shadow-2xl transition-colors">
+        <div className="flex items-center justify-between border-b border-surface-200 dark:border-surface-800 px-6 py-4">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500/10 text-brand-600 dark:text-brand-400">
               <Plus className="h-4 w-4" />
             </div>
-            <h3 className="text-base font-bold text-surface-900">Infratuzilma Ob'ekti Qo'shish</h3>
+            <h3 className="text-base font-bold text-surface-900 dark:text-white">
+              Add Infrastructure Node
+            </h3>
           </div>
-          <button onClick={onClose} aria-label="Close dialog" className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100">
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 hover:text-surface-700 dark:hover:text-surface-200 transition"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Form Selector Tabs */}
-        <div className="grid grid-cols-4 border-b border-surface-200 bg-surface-50 p-1 text-center text-xs font-semibold">
+        <div className="grid grid-cols-4 border-b border-surface-200 dark:border-surface-800 bg-surface-50 dark:bg-surface-950/60 p-1 text-center text-xs font-semibold">
           <button
             type="button"
             onClick={() => setActiveForm('building')}
             className={`rounded-lg py-1.5 transition ${
-              activeForm === 'building' ? 'bg-white text-brand-700 shadow-xs' : 'text-surface-600'
+              activeForm === 'building'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400'
             }`}
           >
             {t('inventory.totalBuildings')}
@@ -169,7 +178,9 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
             type="button"
             onClick={() => setActiveForm('floor')}
             className={`rounded-lg py-1.5 transition ${
-              activeForm === 'floor' ? 'bg-white text-brand-700 shadow-xs' : 'text-surface-600'
+              activeForm === 'floor'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400'
             }`}
           >
             {t('inventory.totalFloors')}
@@ -178,7 +189,9 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
             type="button"
             onClick={() => setActiveForm('room')}
             className={`rounded-lg py-1.5 transition ${
-              activeForm === 'room' ? 'bg-white text-brand-700 shadow-xs' : 'text-surface-600'
+              activeForm === 'room'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400'
             }`}
           >
             {t('inventory.totalRooms')}
@@ -187,7 +200,9 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
             type="button"
             onClick={() => setActiveForm('device')}
             className={`rounded-lg py-1.5 transition ${
-              activeForm === 'device' ? 'bg-white text-brand-700 shadow-xs' : 'text-surface-600'
+              activeForm === 'device'
+                ? 'bg-white dark:bg-surface-800 text-brand-700 dark:text-brand-300 shadow-xs'
+                : 'text-surface-600 dark:text-surface-400'
             }`}
           >
             {t('inventory.totalDevices')}
@@ -196,7 +211,7 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
           {errorMsg && (
-            <div className="rounded-lg bg-rose-50 p-3 text-xs font-medium text-rose-700">
+            <div className="rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 p-3 text-xs font-medium text-rose-700 dark:text-rose-300">
               {errorMsg}
             </div>
           )}
@@ -204,35 +219,41 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
           {activeForm === 'building' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.buildingName')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.buildingName')}
+                </label>
                 <input
                   type="text"
                   required
                   value={bName}
                   onChange={(e) => setBName(e.target.value)}
-                  placeholder="Masalan: Bosh O'quv Binosi"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="e.g. Headquarters Campus"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.buildingCode')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.buildingCode')}
+                </label>
                 <input
                   type="text"
                   required
                   value={bCode}
                   onChange={(e) => setBCode(e.target.value)}
-                  placeholder="Masalan: BLD-A"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="e.g. HQ-01"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.address')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.address')}
+                </label>
                 <input
                   type="text"
                   value={bAddress}
                   onChange={(e) => setBAddress(e.target.value)}
-                  placeholder="Toshkent, Amir Temur 108"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="e.g. 100 Main St"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
             </>
@@ -241,11 +262,13 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
           {activeForm === 'floor' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.totalBuildings')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.totalBuildings')}
+                </label>
                 <select
                   value={selectedBId}
                   onChange={(e) => setSelectedBId(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                 >
                   {buildings.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -255,24 +278,28 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.level')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.level')}
+                </label>
                 <input
                   type="number"
                   required
                   value={fLevel}
                   onChange={(e) => setFLevel(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">Qavat nomi</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  Floor Name
+                </label>
                 <input
                   type="text"
                   required
                   value={fName}
                   onChange={(e) => setFName(e.target.value)}
-                  placeholder="Masalan: 2-qavat (Laboratoriyalar)"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="e.g. 2nd Floor Engineering Lab"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
             </>
@@ -281,7 +308,9 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
           {activeForm === 'room' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.totalBuildings')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.totalBuildings')}
+                </label>
                 <select
                   value={selectedBId}
                   onChange={(e) => {
@@ -290,7 +319,7 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
                     const fList = buildings.find((b) => b.id === bId)?.floors || [];
                     setSelectedFId(fList[0]?.id || 0);
                   }}
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                 >
                   {buildings.map((b) => (
                     <option key={b.id} value={b.id}>
@@ -300,11 +329,13 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.totalFloors')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.totalFloors')}
+                </label>
                 <select
                   value={selectedFId}
                   onChange={(e) => setSelectedFId(Number(e.target.value))}
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                 >
                   {floorsForSelectedB.map((f) => (
                     <option key={f.id} value={f.id}>
@@ -314,25 +345,29 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.roomNumber')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.roomNumber')}
+                </label>
                 <input
                   type="text"
                   required
                   value={rNumber}
                   onChange={(e) => setRNumber(e.target.value)}
                   placeholder="204"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">Xona nomi</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  Room Name
+                </label>
                 <input
                   type="text"
                   required
                   value={rName}
                   onChange={(e) => setRName(e.target.value)}
-                  placeholder="Tarmoq Laboratoriyasi"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="e.g. Server Room B"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
             </>
@@ -341,45 +376,53 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
           {activeForm === 'device' && (
             <>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">Qurilma nomi</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  Device Name
+                </label>
                 <input
                   type="text"
                   required
                   value={dName}
                   onChange={(e) => setDName(e.target.value)}
                   placeholder="Core Switch 01"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">Xostnom (Hostname)</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  Hostname
+                </label>
                 <input
                   type="text"
                   required
                   value={dHostname}
                   onChange={(e) => setDHostname(e.target.value)}
-                  placeholder="sw-core-01.local"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="sw-core-01.corp.internal"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">{t('inventory.ipAddress')}</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  {t('inventory.ipAddress')}
+                </label>
                 <input
                   type="text"
                   required
                   value={dIp}
                   onChange={(e) => setDIp(e.target.value)}
                   placeholder="192.168.10.1"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-surface-700">{t('inventory.type')}</label>
+                  <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                    {t('inventory.type')}
+                  </label>
                   <select
                     value={dType}
                     onChange={(e) => setDType(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                   >
                     <option value="workstation">Workstation</option>
                     <option value="server">Server</option>
@@ -389,43 +432,39 @@ export const CreateLocationModal: React.FC<CreateLocationModalProps> = ({ buildi
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-surface-700">{t('inventory.os')}</label>
+                  <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                    {t('inventory.os')}
+                  </label>
                   <input
                     type="text"
                     value={dOs}
                     onChange={(e) => setDOs(e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white focus:border-brand-500 focus:outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-surface-700">Xona ID (ixtiyoriy)</label>
+                <label className="block text-xs font-semibold text-surface-700 dark:text-surface-300">
+                  Room ID (Optional)
+                </label>
                 <input
                   type="number"
                   value={selectedRId || ''}
                   onChange={(e) => setSelectedRId(Number(e.target.value))}
-                  placeholder="Xona ID raqami"
-                  className="mt-1 w-full rounded-lg border border-surface-300 px-3 py-2 text-xs focus:border-brand-500 focus:outline-none"
+                  placeholder="Room ID number"
+                  className="mt-1 w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-xs text-surface-900 dark:text-white placeholder-surface-400 focus:border-brand-500 focus:outline-none"
                 />
               </div>
             </>
           )}
 
           <div className="flex justify-end gap-2 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg bg-surface-100 px-4 py-2 text-xs font-semibold text-surface-700 hover:bg-surface-200"
-            >
+            <Button type="button" variant="secondary" size="sm" onClick={onClose}>
               {t('incidents.cancel')}
-            </button>
-            <button
-              type="submit"
-              disabled={isPending}
-              className="rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 disabled:opacity-50"
-            >
-              {isPending ? 'Saqlanmoqda...' : t('incidents.confirmAction')}
-            </button>
+            </Button>
+            <Button type="submit" variant="primary" size="sm" isLoading={isPending}>
+              {isPending ? 'Saving...' : t('incidents.confirmAction')}
+            </Button>
           </div>
         </form>
       </div>

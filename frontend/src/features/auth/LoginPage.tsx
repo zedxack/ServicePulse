@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Activity, AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { Activity, AlertCircle, ArrowRight, Eye, EyeOff, Lock, Mail, Shield, Sparkles } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { LanguageSwitcher } from '../../shared/components/LanguageSwitcher';
+import { ThemeToggle } from '../../shared/components/ThemeToggle';
+import { PulseIndicator } from '../../shared/components/PulseIndicator';
 import { JoinOrganizationForm } from './JoinOrganizationForm';
 import { RegisterOrganizationForm } from './RegisterOrganizationForm';
 
@@ -44,33 +46,60 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-surface-50 text-surface-900">
-      {/* Top Navbar */}
-      <header className="flex items-center justify-between border-b border-surface-200 bg-white px-6 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+    <div className="relative flex min-h-screen flex-col bg-surface-50 text-surface-900 transition-colors duration-200 dark:bg-[#090d16] dark:text-white">
+      {/* Background Subtle Tactical Grid */}
+      <div className="pointer-events-none absolute inset-0 sp-grid-mesh opacity-40 dark:opacity-20" />
+
+      {/* Top Command Bar */}
+      <header className="relative z-10 flex items-center justify-between border-b border-surface-200 bg-white/80 px-6 py-3.5 backdrop-blur-md dark:border-white/10 dark:bg-surface-900/80">
+        <div className="flex items-center gap-3">
+          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-brand-600 via-sky-500 to-cyan-400 text-white shadow-md shadow-brand-500/25">
             <Activity className="h-5 w-5" />
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 dark:border-surface-900" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-surface-900">{t('app.title', 'ServicePulse')}</h1>
-            <p className="text-xs text-surface-500">{t('app.subtitle', 'Hybrid RMM & ITSM Platform')}</p>
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold tracking-tight text-surface-900 dark:text-white">
+                {t('app.title', 'ServicePulse')}
+              </h1>
+              <span className="rounded bg-brand-50 px-1.5 py-0.2 text-[9px] font-bold text-brand-700 ring-1 ring-brand-600/20 dark:bg-brand-950/60 dark:text-brand-300 dark:ring-brand-500/30">
+                ENTERPRISE
+              </span>
+            </div>
+            <p className="text-[11px] text-surface-500 dark:text-surface-400">
+              {t('app.subtitle', 'Hybrid RMM & ITSM Platform')}
+            </p>
           </div>
         </div>
-        <LanguageSwitcher />
+
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 rounded-full border border-surface-200 bg-surface-100/60 px-3 py-1 text-[11px] font-medium text-surface-600 dark:border-white/10 dark:bg-surface-800/60 dark:text-surface-300">
+            <PulseIndicator status="online" size="sm" ping={true} />
+            <span>Telemetry Ingestion Active</span>
+          </div>
+          <ThemeToggle />
+          <LanguageSwitcher />
+        </div>
       </header>
 
-      {/* Main Container */}
-      <main className="flex flex-1 items-center justify-center p-6">
-        <div className="w-full max-w-lg space-y-6">
-          <div className="rounded-2xl border border-surface-200 bg-white p-8 shadow-sm">
+      {/* Main Center Viewport */}
+      <main className="relative z-10 flex flex-1 items-center justify-center p-4 sm:p-6 md:p-8">
+        <div className="w-full max-w-lg space-y-5">
+          <div className="relative overflow-hidden rounded-2xl border border-surface-200 bg-white p-6 sm:p-8 shadow-xl shadow-surface-900/5 backdrop-blur-xl dark:border-white/10 dark:bg-surface-900/90 dark:shadow-black/40">
+            {/* Top Accent Gradient Bar */}
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-600 via-sky-400 to-cyan-400" />
+
             {/* Header Titles */}
             <div className="mb-6 text-center">
-              <h2 className="text-xl font-bold tracking-tight text-surface-900">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400">
+                <Shield className="h-5 w-5" />
+              </div>
+              <h2 className="text-xl font-bold tracking-tight text-surface-900 dark:text-white">
                 {mode === 'login' && t('auth.loginTitle', 'Sign in to ServicePulse')}
                 {mode === 'join' && t('auth.joinTitle', 'Join Existing Organization')}
                 {mode === 'register_org' && t('auth.registerOrgTitle', 'Register New Organization')}
               </h2>
-              <p className="mt-1 text-xs text-surface-500">
+              <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">
                 {mode === 'login' && t('auth.loginSubtitle', 'Enter your corporate credentials to continue')}
                 {mode === 'join' && t('auth.joinSubtitle', 'Use your invitation code to activate your account')}
                 {mode === 'register_org' && t('auth.registerOrgSubtitle', 'Apply for a new tenant space for your institution')}
@@ -78,7 +107,7 @@ export const LoginPage: React.FC = () => {
             </div>
 
             {/* Mode Navigation Tabs */}
-            <div className="mb-6 flex rounded-lg bg-surface-100 p-1 text-xs font-semibold">
+            <div className="mb-6 flex rounded-xl border border-surface-200 bg-surface-100/80 p-1 text-xs font-semibold dark:border-white/10 dark:bg-surface-800/60">
               <button
                 type="button"
                 data-testid="tab-login"
@@ -86,10 +115,10 @@ export const LoginPage: React.FC = () => {
                   setMode('login');
                   setError(null);
                 }}
-                className={`flex-1 rounded-md py-2 transition-all ${
+                className={`flex-1 rounded-lg py-2 transition-all ${
                   mode === 'login'
-                    ? 'bg-white text-surface-900 shadow-sm'
-                    : 'text-surface-600 hover:text-surface-900'
+                    ? 'bg-white text-surface-900 shadow-xs dark:bg-surface-900 dark:text-white'
+                    : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-white'
                 }`}
               >
                 {t('auth.tabSignIn', 'Sign In')}
@@ -101,10 +130,10 @@ export const LoginPage: React.FC = () => {
                   setMode('join');
                   setError(null);
                 }}
-                className={`flex-1 rounded-md py-2 transition-all ${
+                className={`flex-1 rounded-lg py-2 transition-all ${
                   mode === 'join'
-                    ? 'bg-white text-surface-900 shadow-sm'
-                    : 'text-surface-600 hover:text-surface-900'
+                    ? 'bg-white text-surface-900 shadow-xs dark:bg-surface-900 dark:text-white'
+                    : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-white'
                 }`}
               >
                 {t('auth.tabJoinOrg', 'Join with Invite')}
@@ -116,10 +145,10 @@ export const LoginPage: React.FC = () => {
                   setMode('register_org');
                   setError(null);
                 }}
-                className={`flex-1 rounded-md py-2 transition-all ${
+                className={`flex-1 rounded-lg py-2 transition-all ${
                   mode === 'register_org'
-                    ? 'bg-white text-surface-900 shadow-sm'
-                    : 'text-surface-600 hover:text-surface-900'
+                    ? 'bg-white text-surface-900 shadow-xs dark:bg-surface-900 dark:text-white'
+                    : 'text-surface-600 hover:text-surface-900 dark:text-surface-400 dark:hover:text-white'
                 }`}
               >
                 {t('auth.tabNewOrg', 'New Organization')}
@@ -130,15 +159,15 @@ export const LoginPage: React.FC = () => {
             {mode === 'login' && (
               <div>
                 {error && (
-                  <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs text-red-700">
-                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+                  <div className="mb-5 flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
                     <span>{error}</span>
                   </div>
                 )}
 
                 <form onSubmit={handleLoginSubmit} className="space-y-4">
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-surface-700">
+                    <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
                       {t('auth.emailLabel', 'Corporate Email')}
                     </label>
                     <div className="relative">
@@ -151,13 +180,13 @@ export const LoginPage: React.FC = () => {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="nom@servicepulse.uz"
-                        className="w-full rounded-lg border border-surface-300 bg-white py-2.5 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                        className="w-full rounded-lg border border-surface-300 bg-white py-2.5 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs font-semibold text-surface-700">
+                    <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
                       {t('auth.passwordLabel', 'Password')}
                     </label>
                     <div className="relative">
@@ -170,12 +199,12 @@ export const LoginPage: React.FC = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••••••"
-                        className="w-full rounded-lg border border-surface-300 bg-white py-2.5 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+                        className="w-full rounded-lg border border-surface-300 bg-white py-2.5 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600"
+                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -187,7 +216,7 @@ export const LoginPage: React.FC = () => {
                     type="submit"
                     disabled={isSubmitting}
                     data-testid="login-submit-btn"
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-brand-600 to-sky-600 py-2.5 text-sm font-semibold text-white shadow-md shadow-brand-600/20 transition-all hover:from-brand-500 hover:to-sky-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 disabled:opacity-60"
                   >
                     {isSubmitting ? (
                       <span>{t('auth.loggingIn', 'Signing In...')}</span>
@@ -213,9 +242,10 @@ export const LoginPage: React.FC = () => {
             )}
           </div>
 
-          <p className="text-center text-xs text-surface-400">
-            {t('app.tagline', 'Enterprise Hybrid RMM & ITSM')} &bull; Muhammadyusuf Usmonov (AT-Servis BMI)
-          </p>
+          <div className="flex items-center justify-center gap-2 text-center text-xs text-surface-500 dark:text-surface-400">
+            <Sparkles className="h-3.5 w-3.5 text-brand-500" />
+            <span>{t('app.tagline', 'Enterprise Hybrid RMM & ITSM')} &bull; Muhammadyusuf Usmonov (AT-Servis BMI)</span>
+          </div>
         </div>
       </main>
     </div>

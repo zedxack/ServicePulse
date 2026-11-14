@@ -1,0 +1,208 @@
+/* ==============================================================================
+   ServicePulse Design Tokens
+   Enterprise Hybrid RMM & ITSM Platform — Command Center Design System
+   Author: Muhammadyusuf Usmonov (AT-Servis BMI)
+   ============================================================================== */
+
+:root {
+  /* Color Palette — Refined Light Mode */
+  --sp-bg-canvas: #f8fafc;
+  --sp-bg-surface: #ffffff;
+  --sp-bg-surface-elevated: #ffffff;
+  --sp-bg-surface-subtle: #f1f5f9;
+  --sp-bg-surface-active: #e2e8f0;
+  --sp-bg-overlay: rgba(15, 23, 42, 0.4);
+
+  /* Borders & Dividers */
+  --sp-border-subtle: #e2e8f0;
+  --sp-border-default: #cbd5e1;
+  --sp-border-strong: #94a3b8;
+  --sp-border-focus: #0284c7;
+
+  /* Typography Colors (WCAG 2.2 AA High Contrast) */
+  --sp-text-primary: #0f172a;
+  --sp-text-secondary: #334155;
+  --sp-text-muted: #64748b;
+  --sp-text-subtle: #94a3b8;
+  --sp-text-inverse: #ffffff;
+
+  /* Brand / Signal Palette (Precision Blue & Cyan Signal) */
+  --sp-brand-50: #f0f9ff;
+  --sp-brand-100: #e0f2fe;
+  --sp-brand-200: #bae6fd;
+  --sp-brand-500: #0284c7;
+  --sp-brand-600: #0369a1;
+  --sp-brand-700: #075985;
+  --sp-brand-glow: rgba(2, 132, 199, 0.15);
+  --sp-brand-accent: #0ea5e9;
+
+  /* Semantic Telemetry Colors */
+  --sp-status-online: #10b981;
+  --sp-status-online-bg: #ecfdf5;
+  --sp-status-online-border: #a7f3d0;
+  --sp-status-online-text: #065f46;
+
+  --sp-status-warning: #f59e0b;
+  --sp-status-warning-bg: #fffbeb;
+  --sp-status-warning-border: #fde68a;
+  --sp-status-warning-text: #92400e;
+
+  --sp-status-critical: #ef4444;
+  --sp-status-critical-bg: #fef2f2;
+  --sp-status-critical-border: #fecaca;
+  --sp-status-critical-text: #991b1b;
+
+  --sp-status-info: #3b82f6;
+  --sp-status-info-bg: #eff6ff;
+  --sp-status-info-border: #bfdbfe;
+  --sp-status-info-text: #1e40af;
+
+  /* Shadows & Elevation */
+  --sp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --sp-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --sp-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --sp-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --sp-shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  /* Animation & Motion */
+  --sp-transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --sp-transition-normal: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --sp-transition-slow: 300ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Typography */
+  --sp-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --sp-font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* ==============================================================================
+   Dark Theme — Tactical Command Center Palette
+   Deep graphite & slate foundation with electric pulse accents
+   ============================================================================== */
+.dark {
+  /* Color Palette — Command Center Slate & Deep Navy */
+  --sp-bg-canvas: #090d16;
+  --sp-bg-surface: #0f172a;
+  --sp-bg-surface-elevated: #1e293b;
+  --sp-bg-surface-subtle: #162032;
+  --sp-bg-surface-active: #24344d;
+  --sp-bg-overlay: rgba(2, 6, 23, 0.75);
+
+  /* Borders & Dividers */
+  --sp-border-subtle: rgba(255, 255, 255, 0.07);
+  --sp-border-default: rgba(255, 255, 255, 0.12);
+  --sp-border-strong: rgba(255, 255, 255, 0.22);
+  --sp-border-focus: #38bdf8;
+
+  /* Typography Colors */
+  --sp-text-primary: #f8fafc;
+  --sp-text-secondary: #cbd5e1;
+  --sp-text-muted: #94a3b8;
+  --sp-text-subtle: #64748b;
+  --sp-text-inverse: #090d16;
+
+  /* Brand / Signal Palette (Restrained Electric Cyan & Sapphire) */
+  --sp-brand-50: #082f49;
+  --sp-brand-100: #0c4a6e;
+  --sp-brand-200: #075985;
+  --sp-brand-500: #0284c7;
+  --sp-brand-600: #0ea5e9;
+  --sp-brand-700: #38bdf8;
+  --sp-brand-glow: rgba(56, 189, 248, 0.2);
+  --sp-brand-accent: #00e5ff;
+
+  /* High-Contrast Semantic Telemetry Colors */
+  --sp-status-online: #10b981;
+  --sp-status-online-bg: rgba(16, 185, 129, 0.12);
+  --sp-status-online-border: rgba(16, 185, 129, 0.35);
+  --sp-status-online-text: #34d399;
+
+  --sp-status-warning: #f59e0b;
+  --sp-status-warning-bg: rgba(245, 158, 11, 0.12);
+  --sp-status-warning-border: rgba(245, 158, 11, 0.35);
+  --sp-status-warning-text: #fbbf24;
+
+  --sp-status-critical: #ef4444;
+  --sp-status-critical-bg: rgba(239, 68, 68, 0.14);
+  --sp-status-critical-border: rgba(239, 68, 68, 0.35);
+  --sp-status-critical-text: #f87171;
+
+  --sp-status-info: #38bdf8;
+  --sp-status-info-bg: rgba(56, 189, 248, 0.12);
+  --sp-status-info-border: rgba(56, 189, 248, 0.35);
+  --sp-status-info-text: #7dd3fc;
+
+  /* Elevation Glows & Shadows */
+  --sp-shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --sp-shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --sp-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --sp-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.7), 0 4px 6px -4px rgba(0, 0, 0, 0.5);
+  --sp-shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+}
+
+/* ==============================================================================
+   Reduced Motion Accessibility Preference
+   ============================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==============================================================================
+   Core Utility Classes Built on ServicePulse Design Tokens
+   ============================================================================== */
+.sp-card {
+  background-color: var(--sp-bg-surface);
+  border: 1px solid var(--sp-border-subtle);
+  border-radius: 0.75rem;
+  box-shadow: var(--sp-shadow-xs);
+  transition: border-color var(--sp-transition-normal), box-shadow var(--sp-transition-normal);
+}
+
+.sp-card:hover {
+  border-color: var(--sp-border-default);
+}
+
+.sp-card-elevated {
+  background-color: var(--sp-bg-surface-elevated);
+  border: 1px solid var(--sp-border-default);
+  border-radius: 0.75rem;
+  box-shadow: var(--sp-shadow-sm);
+}
+
+.sp-mono {
+  font-family: var(--sp-font-mono);
+  font-feature-settings: 'tnum' on, 'zero' on;
+}
+
+/* Custom Tactical Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sp-border-default);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sp-border-strong);
+}
+
+/* Subtle Technical Grid Background for Command Center Feel */
+.sp-grid-mesh {
+  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, var(--sp-border-subtle) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--sp-border-subtle) 1px, transparent 1px);
+}

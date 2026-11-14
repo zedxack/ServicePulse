@@ -98,15 +98,15 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {error && (
-        <div className="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
-          <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
+        <div className="flex items-center gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+          <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Invitation Code with Inline Validation */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-surface-700">
+        <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
           {t('auth.invitationCodeLabel', 'Invitation Code')}
         </label>
         <div className="flex gap-2">
@@ -124,25 +124,25 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
                 setValidationError(null);
               }}
               placeholder="sp_inv_..."
-              className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm font-mono text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+              className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm font-mono text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
             />
           </div>
           <button
             type="button"
             onClick={handleValidateCode}
             disabled={isValidating || !invitationCode.trim()}
-            className="rounded-lg border border-surface-300 bg-surface-100 px-3 py-2 text-xs font-medium text-surface-700 hover:bg-surface-200 disabled:opacity-50"
+            className="rounded-lg border border-surface-300 bg-surface-100 px-3 py-2 text-xs font-medium text-surface-700 hover:bg-surface-200 disabled:opacity-50 dark:border-white/10 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700"
           >
             {isValidating ? t('common.checking', 'Checking...') : t('common.verify', 'Verify')}
           </button>
         </div>
 
         {validationInfo && (
-          <div className="mt-2 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-800">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+          <div className="mt-2 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
             <div>
               <p className="font-semibold">{validationInfo.organization_name}</p>
-              <p className="text-emerald-700">
+              <p className="text-emerald-700 dark:text-emerald-400">
                 {t('auth.roleAssigned', 'Assigned role')}: <span className="font-medium capitalize">{validationInfo.role_name}</span>
               </p>
             </div>
@@ -150,13 +150,16 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
         )}
 
         {validationError && (
-          <p className="mt-1 text-xs text-red-600">{validationError}</p>
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+            <AlertCircle className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+            <span>{validationError}</span>
+          </div>
         )}
       </div>
 
       {/* Full Name */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-surface-700">
+        <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
           {t('auth.fullNameLabel', 'Full Name')}
         </label>
         <div className="relative">
@@ -169,14 +172,14 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Muhammadyusuf Usmonov"
-            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
           />
         </div>
       </div>
 
-      {/* Email */}
+      {/* Corporate Email */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-surface-700">
+        <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
           {t('auth.emailLabel', 'Corporate Email')}
         </label>
         <div className="relative">
@@ -189,14 +192,14 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="user@organization.uz"
-            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-3 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
           />
         </div>
       </div>
 
-      {/* Password with Visibility Toggle & Strength Meter */}
+      {/* Password with Strength Meter */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-surface-700">
+        <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
           {t('auth.passwordLabel', 'Password')}
         </label>
         <div className="relative">
@@ -209,13 +212,12 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••••••"
-            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600"
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200"
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -225,7 +227,7 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
 
       {/* Confirm Password */}
       <div>
-        <label className="mb-1 block text-xs font-semibold text-surface-700">
+        <label className="mb-1 block text-xs font-semibold text-surface-700 dark:text-surface-300">
           {t('auth.confirmPasswordLabel', 'Confirm Password')}
         </label>
         <div className="relative">
@@ -238,13 +240,12 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="••••••••••••"
-            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
+            className="w-full rounded-lg border border-surface-300 bg-white py-2 pl-9 pr-10 text-sm text-surface-900 placeholder:text-surface-400 focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:border-brand-400"
           />
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600"
-            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            className="absolute inset-y-0 right-0 flex items-center pr-3 text-surface-400 hover:text-surface-600 dark:hover:text-surface-200"
           >
             {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </button>
@@ -254,23 +255,23 @@ export const JoinOrganizationForm: React.FC<JoinOrganizationFormProps> = ({ onSw
       <button
         type="submit"
         disabled={isSubmitting}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-1 disabled:opacity-60 dark:bg-brand-600 dark:hover:bg-brand-500"
       >
         {isSubmitting ? (
-          <span>{t('auth.joiningOrg', 'Joining Organization...')}</span>
+          <span>{t('auth.joining', 'Joining Organization...')}</span>
         ) : (
           <>
-            <span>{t('auth.joinOrgButton', 'Join Organization')}</span>
+            <span>{t('auth.joinSubmitButton', 'Join Organization')}</span>
             <ArrowRight className="h-4 w-4" />
           </>
         )}
       </button>
 
-      <div className="text-center pt-2">
+      <div className="pt-2 text-center text-xs">
         <button
           type="button"
           onClick={onSwitchToLogin}
-          className="text-xs text-brand-600 hover:underline font-medium"
+          className="font-medium text-brand-600 hover:underline dark:text-brand-400"
         >
           {t('auth.alreadyHaveAccount', 'Already have an account? Sign in')}
         </button>

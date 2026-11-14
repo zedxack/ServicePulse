@@ -41,15 +41,15 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthProps> = ({ passwor
     switch (score) {
       case 0:
       case 1:
-        return { label: t('auth.strengthWeak', 'Weak'), color: 'bg-red-500', text: 'text-red-600' };
+        return { label: t('auth.strengthWeak', 'Weak'), color: 'bg-red-500', text: 'text-red-600 dark:text-red-400' };
       case 2:
-        return { label: t('auth.strengthFair', 'Fair'), color: 'bg-amber-500', text: 'text-amber-600' };
+        return { label: t('auth.strengthFair', 'Fair'), color: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' };
       case 3:
-        return { label: t('auth.strengthGood', 'Good'), color: 'bg-blue-500', text: 'text-blue-600' };
+        return { label: t('auth.strengthGood', 'Good'), color: 'bg-blue-500', text: 'text-blue-600 dark:text-blue-400' };
       case 4:
-        return { label: t('auth.strengthStrong', 'Strong'), color: 'bg-emerald-500', text: 'text-emerald-600' };
+        return { label: t('auth.strengthStrong', 'Strong'), color: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' };
       default:
-        return { label: '', color: 'bg-surface-200', text: 'text-surface-500' };
+        return { label: '', color: 'bg-surface-200 dark:bg-surface-800', text: 'text-surface-500' };
     }
   };
 
@@ -59,7 +59,7 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthProps> = ({ passwor
     <div className="mt-2 space-y-2">
       {/* Progress Bars */}
       <div className="flex items-center justify-between text-xs">
-        <span className="text-surface-500">{t('auth.passwordStrength', 'Password strength')}:</span>
+        <span className="text-surface-500 dark:text-surface-400">{t('auth.passwordStrength', 'Password strength')}:</span>
         <span className={`font-semibold ${text}`}>{label}</span>
       </div>
       <div className="grid grid-cols-4 gap-1.5">
@@ -67,28 +67,28 @@ export const PasswordStrengthMeter: React.FC<PasswordStrengthProps> = ({ passwor
           <div
             key={step}
             className={`h-1.5 rounded-full transition-colors duration-200 ${
-              score >= step ? color : 'bg-surface-200'
+              score >= step ? color : 'bg-surface-200 dark:bg-surface-800'
             }`}
           />
         ))}
       </div>
 
       {/* Criteria Checklist */}
-      <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] text-surface-500">
+      <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] text-surface-500 dark:text-surface-400">
         <div className="flex items-center gap-1">
-          {hasLength ? <Check className="h-3 w-3 text-emerald-600" /> : <X className="h-3 w-3 text-surface-400" />}
+          {hasLength ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> : <X className="h-3 w-3 text-surface-400" />}
           <span>{t('auth.ruleLength', '8+ characters')}</span>
         </div>
         <div className="flex items-center gap-1">
-          {hasUpper && hasLower ? <Check className="h-3 w-3 text-emerald-600" /> : <X className="h-3 w-3 text-surface-400" />}
+          {hasUpper && hasLower ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> : <X className="h-3 w-3 text-surface-400" />}
           <span>{t('auth.ruleCase', 'Upper & lowercase')}</span>
         </div>
         <div className="flex items-center gap-1">
-          {hasDigit ? <Check className="h-3 w-3 text-emerald-600" /> : <X className="h-3 w-3 text-surface-400" />}
+          {hasDigit ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> : <X className="h-3 w-3 text-surface-400" />}
           <span>{t('auth.ruleDigit', 'At least 1 number')}</span>
         </div>
         <div className="flex items-center gap-1">
-          {hasSpecial ? <Check className="h-3 w-3 text-emerald-600" /> : <X className="h-3 w-3 text-surface-400" />}
+          {hasSpecial ? <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> : <X className="h-3 w-3 text-surface-400" />}
           <span>{t('auth.ruleSpecial', 'Special character')}</span>
         </div>
       </div>

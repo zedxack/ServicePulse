@@ -1,15 +1,22 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Activity,
   AlertTriangle,
-  Building,
+  Building2,
   CheckCircle2,
+  History,
   RefreshCw,
   Server,
   ShieldAlert,
 } from 'lucide-react';
 import { dashboardApi } from '../../shared/api/dashboard';
 import { PlatformDashboardResponse } from '../../shared/types/dashboard';
+import { MetricCard } from '../../shared/components/MetricCard';
+import { Badge } from '../../shared/components/Badge';
+import { PulseIndicator } from '../../shared/components/PulseIndicator';
+import { LoadingSkeleton } from '../../shared/components/LoadingSkeleton';
+import { EmptyState } from '../../shared/components/EmptyState';
 
 export const PlatformDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -24,7 +31,7 @@ export const PlatformDashboardPage: React.FC = () => {
       const resp = await dashboardApi.getPlatformDashboard();
       setData(resp);
     } catch {
-      setError(t('dashboard.errorLoading'));
+      setError(t('dashboard.errorLoading', 'Failed to load platform telemetry'));
     } finally {
       setLoading(false);
     }
@@ -36,25 +43,28 @@ export const PlatformDashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600"></div>
-          <span className="text-xs font-medium text-surface-500">{t('dashboard.loading')}</span>
+      <div className="space-y-6">
+        <div className="h-8 w-64 rounded bg-surface-200 dark:bg-surface-800 animate-pulse" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <LoadingSkeleton variant="card" count={4} />
         </div>
+        <LoadingSkeleton variant="card" className="h-64" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-950/40">
         <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
-        <p className="mt-2 text-sm font-semibold text-red-800">{error || t('dashboard.errorLoading')}</p>
+        <p className="mt-2 text-sm font-semibold text-red-800 dark:text-red-300">
+          {error || t('dashboard.errorLoading', 'Failed to load dashboard')}
+        </p>
         <button
           onClick={fetchData}
-          className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+          className="mt-4 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-red-700"
         >
-          {t('dashboard.refresh')}
+          {t('dashboard.refresh', 'Try Again')}
         </button>
       </div>
     );
@@ -65,118 +75,114 @@ export const PlatformDashboardPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-surface-900">{t('platform.title')}</h1>
-          <p className="text-xs text-surface-500">{t('platform.subtitle')}</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-surface-900 dark:text-white">
+              {t('platform.title', 'Platform Super Admin Command Center')}
+            </h1>
+            <Badge variant="brand" size="xs">GLOBAL</Badge>
+          </div>
+          <p className="text-xs text-surface-500 dark:text-surface-400">
+            {t('platform.subtitle', 'Cross-tenant infrastructure orchestration, global telemetry and security governance')}
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-surface-400">
-            {t('dashboard.lastUpdated')}: {new Date(data.timestamp).toLocaleTimeString()}
-          </span>
+          <div className="flex items-center gap-1.5 text-xs text-surface-400 font-mono dark:text-surface-500">
+            <PulseIndicator status="online" size="sm" />
+            <span>{new Date(data.timestamp).toLocaleTimeString()}</span>
+          </div>
           <button
             onClick={fetchData}
-            className="flex items-center gap-1.5 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-medium text-surface-700 shadow-xs hover:bg-surface-50 transition"
+            className="flex items-center gap-1.5 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-medium text-surface-700 shadow-xs hover:bg-surface-50 transition dark:border-white/10 dark:bg-surface-900 dark:text-surface-300 dark:hover:bg-surface-800"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            <span>{t('dashboard.refresh')}</span>
+            <span>{t('dashboard.refresh', 'Refresh')}</span>
           </button>
         </div>
       </div>
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Total Organizations */}
-        <div className="rounded-xl border border-surface-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">{t('platform.totalOrgs')}</span>
-            <div className="rounded-lg bg-brand-50 p-2 text-brand-600">
-              <Building className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-surface-900">{data.total_organizations}</div>
-          <div className="mt-1 flex items-center gap-2 text-[11px] text-surface-500">
-            <span className="text-emerald-600 font-semibold">{data.active_organizations} {t('platform.activeOrgs').toLowerCase()}</span>
-            <span>&bull;</span>
-            <span className="text-surface-400">{data.inactive_organizations} {t('platform.inactiveOrgs').toLowerCase()}</span>
-          </div>
-        </div>
+        <MetricCard
+          title={t('platform.totalOrgs', 'Organizations')}
+          value={data.total_organizations}
+          subtitle={`${data.active_organizations} active • ${data.inactive_organizations} inactive`}
+          icon={Building2}
+          accent="brand"
+        />
 
-        {/* Platform Devices */}
-        <div className="rounded-xl border border-surface-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">{t('platform.platformDevices')}</span>
-            <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600">
-              <Server className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-surface-900">{data.total_platform_devices}</div>
-          <div className="mt-1 text-[11px] text-surface-500">
-            {data.total_platform_agents} {t('platform.platformAgents').toLowerCase()}
-          </div>
-        </div>
+        <MetricCard
+          title={t('platform.platformDevices', 'Managed Devices')}
+          value={data.total_platform_devices}
+          subtitle={`${data.total_platform_agents} active agent nodes`}
+          icon={Server}
+          accent="purple"
+        />
 
-        {/* Global Active Incidents */}
-        <div className="rounded-xl border border-surface-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">{t('platform.globalIncidents')}</span>
-            <div className={`rounded-lg p-2 ${data.global_active_incidents > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-              <ShieldAlert className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-bold text-surface-900">{data.global_active_incidents}</div>
-          <div className="mt-1 text-[11px] text-surface-500">
-            {data.global_active_incidents === 0 ? 'No active outages' : 'Attention required'}
-          </div>
-        </div>
+        <MetricCard
+          title={t('platform.globalIncidents', 'Active Incidents')}
+          value={data.global_active_incidents}
+          subtitle={data.global_active_incidents === 0 ? 'All organizations operational' : 'Critical triage required'}
+          icon={ShieldAlert}
+          accent={data.global_active_incidents > 0 ? 'critical' : 'online'}
+        />
 
-        {/* System Health */}
-        <div className="rounded-xl border border-surface-200 bg-white p-5 shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">{t('platform.systemHealth')}</span>
-            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-600">
-              <CheckCircle2 className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            <span className="text-lg font-bold capitalize text-emerald-700">{data.platform_health_status}</span>
-          </div>
-          <div className="mt-1 text-[11px] text-surface-500">
-            {data.total_platform_users} {t('platform.platformUsers').toLowerCase()}
-          </div>
-        </div>
+        <MetricCard
+          title={t('platform.systemHealth', 'Platform Status')}
+          value={data.platform_health_status.toUpperCase()}
+          subtitle={`${data.total_platform_users} registered users`}
+          icon={CheckCircle2}
+          accent="online"
+        />
       </div>
 
       {/* Global Audit Trail Table */}
-      <div className="rounded-xl border border-surface-200 bg-white shadow-xs">
-        <div className="border-b border-surface-200 px-6 py-4">
-          <h2 className="text-sm font-bold text-surface-900">{t('platform.recentAudits')}</h2>
+      <div className="overflow-hidden rounded-xl border border-surface-200 bg-white shadow-xs dark:border-white/10 dark:bg-surface-900">
+        <div className="flex items-center justify-between border-b border-surface-200 px-6 py-4 dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+            <h2 className="text-sm font-bold text-surface-900 dark:text-white">
+              {t('platform.recentAudits', 'Global Security Audit Trail')}
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-surface-400 dark:text-surface-500">
+            Real-Time Tamper-Evident Ledger
+          </span>
         </div>
+
         <div className="overflow-x-auto">
           {data.recent_global_audits && data.recent_global_audits.length > 0 ? (
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-surface-100 bg-surface-50 font-semibold text-surface-600">
+              <thead className="border-b border-surface-100 bg-surface-50 font-semibold text-surface-600 dark:border-white/5 dark:bg-surface-800/60 dark:text-surface-300">
                 <tr>
-                  <th className="px-6 py-3">{t('common.action')}</th>
-                  <th className="px-6 py-3">{t('common.resource')}</th>
-                  <th className="px-6 py-3">ID</th>
-                  <th className="px-6 py-3">{t('common.status')}</th>
-                  <th className="px-6 py-3">{t('common.date')}</th>
+                  <th className="px-6 py-3">{t('common.action', 'Action')}</th>
+                  <th className="px-6 py-3">{t('common.resource', 'Target Resource')}</th>
+                  <th className="px-6 py-3">Resource ID</th>
+                  <th className="px-6 py-3">{t('common.status', 'Status')}</th>
+                  <th className="px-6 py-3">{t('common.date', 'Timestamp')}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-100 text-surface-700">
+              <tbody className="divide-y divide-surface-100 text-surface-700 dark:divide-white/5 dark:text-surface-300">
                 {data.recent_global_audits.map((item) => (
-                  <tr key={item.id} className="hover:bg-surface-50/50">
-                    <td className="px-6 py-3 font-mono font-medium text-surface-900">{item.action}</td>
-                    <td className="px-6 py-3 capitalize text-surface-600">{item.target_resource}</td>
-                    <td className="px-6 py-3 font-mono text-surface-500">{item.target_id || '-'}</td>
-                    <td className="px-6 py-3">
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                        item.status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                      }`}>
-                        {item.status}
-                      </span>
+                  <tr key={item.id} className="transition-colors hover:bg-surface-50/80 dark:hover:bg-surface-800/40">
+                    <td className="px-6 py-3.5 font-mono text-xs font-semibold text-surface-900 dark:text-white">
+                      {item.action}
                     </td>
-                    <td className="px-6 py-3 text-surface-500">
+                    <td className="px-6 py-3.5 font-medium text-surface-600 dark:text-surface-300 capitalize">
+                      {item.target_resource}
+                    </td>
+                    <td className="px-6 py-3.5 font-mono text-surface-500 dark:text-surface-400">
+                      {item.target_id ? `#${item.target_id}` : '—'}
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <Badge
+                        variant={item.status === 'success' ? 'online' : 'offline'}
+                        size="xs"
+                        dot={true}
+                      >
+                        {item.status}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-3.5 font-mono text-xs text-surface-500 dark:text-surface-400">
                       {new Date(item.created_at).toLocaleString()}
                     </td>
                   </tr>
@@ -184,9 +190,12 @@ export const PlatformDashboardPage: React.FC = () => {
               </tbody>
             </table>
           ) : (
-            <div className="p-8 text-center text-xs text-surface-400">
-              {t('platform.noAudits')}
-            </div>
+            <EmptyState
+              icon={Activity}
+              title={t('platform.noAudits', 'No recent audit events')}
+              description="Platform administrative and security actions will be recorded in this tamper-evident ledger."
+              className="m-6"
+            />
           )}
         </div>
       </div>
