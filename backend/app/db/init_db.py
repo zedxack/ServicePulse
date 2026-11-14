@@ -381,8 +381,8 @@ async def init_db(db: AsyncSession) -> None:
             "Triggers diagnostic ARP and gateway ping when device loses LAN connection",
             "ping_timeout",
             None,
-            "check_network",
-            '{"target": "192.168.10.1"}',
+            "recheck_network_endpoint",
+            '{"timeout_seconds": 3.0}',
             False,
         ),
     ]
@@ -405,6 +405,9 @@ async def init_db(db: AsyncSession) -> None:
                 cooldown_seconds=300,
             )
             db.add(rule)
+        else:
+            rule.action_name = action
+            rule.action_parameters = params
     await db.flush()
 
     # 7. Initial Audit Record

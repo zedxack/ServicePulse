@@ -119,4 +119,4 @@ async def test_remediation_rules_seeded(test_db: AsyncSession):
     assert len(rules) >= 3
     rule_actions = {r.action_name for r in rules}
     assert "restart_service" in rule_actions
-    assert "check_network" in rule_actions
+    assert "recheck_network_endpoint" in rule_actions
