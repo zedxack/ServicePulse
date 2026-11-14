@@ -88,6 +88,19 @@ services:
     networks:
       - servicepulse-net
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: servicepulse-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - servicepulse-net
+
 volumes:
   pgdata:
     name: servicepulse-pgdata

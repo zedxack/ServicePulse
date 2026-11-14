@@ -1,0 +1,14 @@
+.git
+.venv
+node_modules
+frontend/node_modules
+frontend/dist
+backend/__pycache__
+agent/__pycache__
+agent/build
+agent/dist
+pgdata
+*.db
+*.sqlite
+.pytest_cache
+.ruff_cache
