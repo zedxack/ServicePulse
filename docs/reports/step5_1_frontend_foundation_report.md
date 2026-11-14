@@ -257,3 +257,46 @@ servicepulse-network-worker   network-worker   Up (healthy)              8000/tc
 - All five dashboards strictly bind to live backend endpoints (`/api/v1/organizations`, `/api/v1/devices`, `/api/v1/incidents`, `/api/v1/audit/logs`, `/api/v1/agent-telemetry/summary`).
 - Loading skeletons, empty states, and error alerts are fully implemented across all views.
 - Contractual SLA Target (e.g. 99.9%) is rigorously separated from discrete probe success ratios. Duration-based SLA is explicitly flagged as "Unavailable until historical downtime engine is implemented" to prevent misleading representations.
+
+---
+
+## 11. Final Docker Production Verification Evidence
+
+### 11.1 Configuration & Build Context Inspection
+- **Dockerfile:** `frontend/Dockerfile` utilizes a two-stage build (`node:20-alpine` builder followed by `nginx:alpine` runner).
+- **Build Context:** Explicit build context is the repository root (`.` with `-f frontend/Dockerfile`), correctly resolving `COPY frontend/ ./` and `COPY infra/docker/nginx.conf /etc/nginx/conf.d/default.conf`.
+- **Nginx Architecture (`infra/docker/nginx.conf`):** Configured with dual stack `listen 80; listen [::]:80;`, SPA routing fallback `try_files $uri $uri/ /index.html;`, and reverse proxies for `/api/` and `/health` to `http://backend:8000/`.
+- **Caddy Architecture (`infra/caddy/Caddyfile`):** Production reverse-proxy handling automated TLS, forwarding `/api/*` and `/health` to `backend:8000`, and all SPA routes to `frontend:80`.
+- **Docker Compose (`compose.yaml` & `compose.prod.yaml`):** Frontends bind to backend services via internal network `servicepulse-net` / `servicepulse-prod-net`.
+
+### 11.2 Dual-Stack & Healthcheck Hardening
+- **Identified Defect:** In Alpine Linux, musl libc `getaddrinfo` prioritizes IPv6 `::1` for `localhost`. Nginx listening only on IPv4 caused `wget -qO- http://localhost/` inside the container to fail with Connection Refused, leaving the container in an `unhealthy` state.
+- **Minimal Fix Applied:**
+  1. Updated `infra/docker/nginx.conf` with `listen 80; listen [::]:80;` to support both IPv4 and IPv6 traffic.
+  2. Updated `frontend/Dockerfile` healthcheck command to `CMD wget -qO- http://127.0.0.1/ || exit 1`.
+  3. Container healthcheck transitions cleanly to `healthy`.
+
+### 11.3 Isolated Live Container Verification Matrix
+An isolated test container (`servicepulse-frontend-audit`) was built and launched on port 5180 on network `servicepulse-net` without altering running database, worker, or backend services:
+
+| Check | Target / Command | Actual HTTP Status | Expected Status | Verification Detail | Result |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Main Page** | `GET http://localhost:5180/` | **200 OK** | 200 OK | Content-Length 846, `<div id="root"></div>` present | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/login` | **200 OK** | 200 OK | Nginx `try_files` SPA fallback to `index.html` | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/dashboard/platform` | **200 OK** | 200 OK | Direct navigation returns SPA container | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/dashboard/company` | **200 OK** | 200 OK | Direct navigation returns SPA container | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/dashboard/sysadmin` | **200 OK** | 200 OK | Direct navigation returns SPA container | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/dashboard/executive` | **200 OK** | 200 OK | Direct navigation returns SPA container | **PASS** |
+| **SPA Route** | `GET http://localhost:5180/dashboard/employee` | **200 OK** | 200 OK | Direct navigation returns SPA container | **PASS** |
+| **Proxy Pass** | `GET http://localhost:5180/health` | **200 OK** | 200 OK | Returns backend JSON: `{"status":"healthy",...}` | **PASS** |
+| **Proxy Pass** | `GET http://localhost:5180/api/v1/auth/me` | **401 Unauthorized** | 401 Unauthorized | Backend HTTPBearer authentication enforced | **PASS** |
+| **Proxy Pass** | `POST http://localhost:5180/api/v1/auth/login` | **401 Unauthorized** | 401 Unauthorized | Body routed to backend; rejected invalid auth | **PASS** |
+| **Origin Isolation** | `index-*.js` asset scan | **N/A** | 0 occurrences | Zero occurrences of `localhost:8000` or `:8000` | **PASS** |
+| **Secret Scan** | `grep -rn 'Pass2026' /usr/share/nginx/html/` | **N/A** | 0 occurrences | Zero passwords or demo accounts found | **PASS** |
+| **Secret Scan** | `grep -rn 'AGENT_ENROLLMENT_SECRET'` | **N/A** | 0 occurrences | Zero enrollment secrets in container filesystem | **PASS** |
+| **Secret Scan** | `grep -rn 'SECRET_KEY'` / `postgres_password` | **N/A** | 0 occurrences | Zero backend secrets or DB credentials | **PASS** |
+| **Container Health** | `docker inspect --format '{{.State.Health.Status}}'` | **healthy** | healthy | Alpine healthcheck evaluates successfully | **PASS** |
+
+### 11.4 Clean Resource Teardown
+- Audit container `servicepulse-frontend-audit` and test image `servicepulse-frontend:audit-test` were safely removed.
+- Existing development and database containers (`servicepulse-backend`, `servicepulse-db`, `servicepulse-network-worker`), volume `servicepulse-pgdata`, and existing images were completely preserved and remain healthy.
