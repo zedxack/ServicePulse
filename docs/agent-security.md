@@ -60,37 +60,49 @@ encrypted = win32crypt.CryptProtectData(
 
 ### 3.1 DPAPI Scope Comparison: Machine-Scope vs. User-Scope
 
-| Dimension | User-Scope DPAPI (`0x1`) | Machine-Scope DPAPI (`0x5`) |
+| Dimension | Default User-Scope DPAPI (`0x0` / `0x1`) | Machine-Scope DPAPI (`0x5` = `0x1 \| 0x4`) |
 |---|---|---|
+| **Flags Definition** | `0x0` (default user-scope) or `0x1` (`CRYPTPROTECT_UI_FORBIDDEN` without `0x4`) | `0x5` = `CRYPTPROTECT_UI_FORBIDDEN` (`0x1`) \| `CRYPTPROTECT_LOCAL_MACHINE` (`0x4`) |
 | **Key Derivation** | MasterKey derived from specific user password/SID in `%APPDATA%\Microsoft\Protect\{SID}` | Machine LSA key in `%SystemRoot%\System32\Microsoft\Protect\{Machine-GUID}` |
 | **Decryption Boundary** | Only processes running in that specific user session | Any process running on the local endpoint (SYSTEM, Admins, Services) |
-| **Service Decryption** | **Fails** when background Windows Service runs under `NT AUTHORITY\SYSTEM` | **Succeeds**: Background Windows Service and Administrator can both decrypt |
+| **Service Decryption** | **Fails** when background Windows Service runs under `NT AUTHORITY\SYSTEM` | **Succeeds**: Background Windows Service and Administrator can both decrypt across reboots |
 | **Offline Defense** | Protected if disk or VM image is extracted | Protected if disk or VM image is extracted |
-| **Local User Defense** | Cryptographically bound to the user profile | **Requires NTFS ACL enforcement** to prevent standard users from reading file |
+| **Local User Defense** | Cryptographically bound to the user profile | **Requires NTFS DACL enforcement** to prevent standard users from reading file |
 
 ### 3.2 Operating System Access Control (NTFS DACL)
-Because machine-scoped DPAPI allows any local process with file read permissions to decrypt, the primary security boundary against non-administrative local users is enforced by Windows NTFS Access Control Lists (DACLs):
+Because machine-scoped DPAPI allows any local process with file read permissions to decrypt, the primary security boundary against non-administrative local users is enforced by Windows NTFS Access Control Lists (DACLs) applied to both the parent directory and the credentials file using exact Windows SIDs:
 
 ```powershell
-icacls.exe credentials.tmp /inheritance:r /grant:r "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" "%USERNAME%:(F)"
+# 1. Secure Parent Directory (%ProgramData%\ServicePulse)
+# Strips inherited permissions and grants FullControl with Object/Container inherit
+icacls.exe "C:\ProgramData\ServicePulse" /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)(F)" "*S-1-5-32-544:(OI)(CI)(F)" "*$UserSID:(OI)(CI)(F)"
+
+# 2. Secure Credential File (credentials.dat)
+icacls.exe "C:\ProgramData\ServicePulse\credentials.dat" /inheritance:r /grant:r "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" "*$UserSID:(F)"
 ```
 - `*S-1-5-18`: `NT AUTHORITY\SYSTEM` (Full Control)
 - `*S-1-5-32-544`: `BUILTIN\Administrators` (Full Control)
-- `%USERNAME%`: The enrolling administrative user (Full Control)
-- `/inheritance:r`: Strips all inherited permissions, explicitly denying `BUILTIN\Users` (`*S-1-5-32-545`) and `Everyone`.
-- Standard, non-elevated user accounts receive `Access is Denied` at the OS filesystem level.
+- `*$UserSID`: Current user's specific Windows SID (e.g. `*S-1-5-21-...:(F)`), resolving language-independently and working seamlessly in PowerShell and CMD without relying on `%USERNAME%` expansion.
+- `/inheritance:r`: Strips all inherited permissions, explicitly removing `BUILTIN\Users` (`*S-1-5-32-545`) and `Everyone`.
+- Standard, non-elevated user accounts receive `Access is Denied` (Win32 Error 5 / `PermissionError: [Errno 13]`) at the OS filesystem layer. Temporary `.tmp` files are hardened during creation and cleaned up immediately.
 
 ### 3.3 Windows Service Privileges & Least Privilege Analysis
 - **Service Identity:** The background service runs under `NT AUTHORITY\LocalSystem`.
-- **Why System Privileges are Required:**
-  1. **Service Control Manager (SCM):** Stopping/starting allowlisted OS services (`wuauserv`, `spooler`, `bits`, `w32time`) requires `SERVICE_START` and `SERVICE_STOP` rights in the service's DACL, restricted by Windows to `SYSTEM` and `Administrators`.
-  2. **Defender & Licensing Diagnostics:** Querying `Get-MpComputerStatus` and CIM `SoftwareLicensingProduct` requires administrative integrity; unprivileged accounts are denied.
-  3. **Enterprise Package Deployment:** System-wide software installations write to `C:\Program Files` and `HKLM\Software`, requiring administrative access.
+- **Privilege Breakdown by Operation:**
+  - *Standard Privileges Sufficient:* Host CPU, RAM, Disk, Uptime, Network IP probing, and offline SQLite queueing can run under an unprivileged user context.
+  - *Elevated / System Privileges Mandated:*
+    1. **Service Control Manager (SCM):** Stopping/starting allowlisted OS services (`wuauserv`, `spooler`, `bits`, `w32time`) requires `SERVICE_START` and `SERVICE_STOP` rights in the service's DACL, restricted by Windows to `SYSTEM` and `Administrators`. Unprivileged accounts receive Win32 Error 5 (`Access is Denied`).
+    2. **Defender & Licensing Diagnostics:** Querying `Get-MpComputerStatus` (WMI namespace `root\Microsoft\Windows\Defender`) and CIM `SoftwareLicensingProduct` requires administrative integrity; unprivileged accounts receive WMI Access Denied.
+    3. **Enterprise Package Deployment:** System-wide software installations write to `%ProgramFiles%` and `HKLM\Software`, requiring administrative access.
+- **Evaluation of Restricted Service Accounts:**
+  - Running under `NT AUTHORITY\LocalService` or `NT AUTHORITY\NetworkService` would satisfy passive metrics but fundamentally disable automated remediation and security telemetry.
+  - A potential future architectural refinement is a dual-process model (unprivileged telemetry collector process + privileged remediation helper process communicating over an authenticated local named pipe). For STEP 4, maintaining single-service simplicity while enforcing strict application-layer gates prevents architectural instability.
 - **Application-Layer Least Privilege Guardrails:**
   - Local strict action allowlist (`ALLOWED_ACTIONS`) and service allowlist (`ALLOWED_SERVICES`).
   - Prohibited core OS services (`lsass`, `csrss`, `smss`, `wininit`, etc.) cannot be targeted.
   - Complete prohibition of `shell=True` and shell metacharacters.
   - Cryptographic SHA-256 and Authenticode digital signature verification.
+  - Service is not installed globally on the host computer without explicit approval.
 
 ---
 

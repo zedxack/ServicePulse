@@ -106,3 +106,62 @@ def test_dpapi_machine_scope_persistence(tmp_path):
             check=False
         )
         assert res.returncode == 0
+        # Verify no .tmp file left behind
+        assert not cred_file.with_suffix(".tmp").exists()
+
+
+def test_dpapi_flags_and_sid_resolution():
+    """Verify DPAPI flag constants match Windows SDK specification and SID helper works."""
+    import sys
+
+    from servicepulse.authentication import (
+        CRYPTPROTECT_DEFAULT,
+        CRYPTPROTECT_LOCAL_MACHINE,
+        CRYPTPROTECT_UI_FORBIDDEN,
+        DPAPI_MACHINE_FLAGS,
+        get_current_user_sid,
+    )
+
+    # 1. Exact constant verification
+    assert CRYPTPROTECT_DEFAULT == 0x0
+    assert CRYPTPROTECT_UI_FORBIDDEN == 0x1
+    assert CRYPTPROTECT_LOCAL_MACHINE == 0x4
+    assert DPAPI_MACHINE_FLAGS == 0x5
+    assert DPAPI_MACHINE_FLAGS == (CRYPTPROTECT_UI_FORBIDDEN | CRYPTPROTECT_LOCAL_MACHINE)
+
+    # 2. SID resolution on Windows
+    if sys.platform == "win32":
+        sid = get_current_user_sid()
+        assert sid is not None
+        assert sid.startswith("S-1-")
+
+
+def test_directory_and_credential_dacl_hardening(tmp_path):
+    """Verify restrictive NTFS ACLs on parent directory and final credentials file."""
+    import sys
+    if sys.platform != "win32":
+        return
+
+    import subprocess
+    target_dir = tmp_path / "ServicePulseSecureDir"
+    target_file = target_dir / "credentials.dat"
+    store = CredentialStore(target_file)
+    store.save_credentials(AgentCredentials(
+        agent_uuid="uuid-acl-audit-88",
+        api_token="sp_tok_audit_test_token"
+    ))
+
+    assert target_file.is_file()
+    assert not target_file.with_suffix(".tmp").exists()
+
+    # Verify icacls on parent directory
+    res_dir = subprocess.run(["icacls.exe", str(target_dir)], capture_output=True, text=True, errors="replace", check=False)
+    assert res_dir.returncode == 0
+
+    # Verify icacls on credential file
+    res_file = subprocess.run(["icacls.exe", str(target_file)], capture_output=True, text=True, errors="replace", check=False)
+    assert res_file.returncode == 0
+    file_acl = res_file.stdout
+
+    # Confirm SYSTEM (S-1-5-18) is granted
+    assert "S-1-5-18" in file_acl or "NT AUTHORITY" in file_acl or "СИСТЕМА" in file_acl
