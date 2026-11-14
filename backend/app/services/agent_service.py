@@ -33,7 +33,10 @@ class AgentService:
     @staticmethod
     async def enroll_agent(enroll_in: AgentEnrollRequest, db: AsyncSession) -> AgentEnrollResponse:
         """Secure agent enrollment using global pre-shared enrollment secret."""
-        if enroll_in.enrollment_secret != settings.AGENT_ENROLLMENT_SECRET:
+        # Enforce constant-time comparison against environment enrollment secret
+        if not settings.AGENT_ENROLLMENT_SECRET or not secrets.compare_digest(
+            enroll_in.enrollment_secret, settings.AGENT_ENROLLMENT_SECRET
+        ):
             # Audit unauthorized enrollment attempt
             db.add(AuditLog(
                 user_id=None,

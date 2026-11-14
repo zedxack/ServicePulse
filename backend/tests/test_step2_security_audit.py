@@ -113,10 +113,12 @@ async def test_cross_tenant_isolation_all_eight_resources(client: AsyncClient):
     org_b_device_id = res_dev.json()["id"]
 
     # Org B enrolls an Agent and submits Telemetry
+    from backend.app.core.config import settings
+
     res_enroll = await client.post(
         "/api/v1/agent/enroll",
         json={
-            "enrollment_secret": "servicepulse-agent-enrollment-secret-2026",
+            "enrollment_secret": settings.AGENT_ENROLLMENT_SECRET,
             "hostname": "orgb-server-01",
             "ip_address": "10.200.1.10",
             "os_name": "Windows Server 2022",

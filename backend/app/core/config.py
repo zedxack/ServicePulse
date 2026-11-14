@@ -33,8 +33,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Agent Enrollment
-    AGENT_ENROLLMENT_SECRET: str = "servicepulse-agent-enrollment-secret-2026"
+    # Agent Enrollment - Pre-shared secret required to enroll new endpoint agents
+    AGENT_ENROLLMENT_SECRET: str = Field(
+        default="",
+        description="Pre-shared enrollment secret for remote agents. Must be set via environment variable."
+    )
 
     # Initial Administrative & Seed Credentials (override via .env)
     FIRST_SUPERUSER_EMAIL: str = "admin@servicepulse.uz"
@@ -59,6 +62,24 @@ class Settings(BaseSettings):
         env = info.data.get("ENVIRONMENT", "development")
         if env == "production" and v is True:
             raise ValueError("WORKER_SIMULATION_MODE cannot be enabled in production environment.")
+        return v
+
+    @field_validator("AGENT_ENROLLMENT_SECRET")
+    @classmethod
+    def validate_agent_enrollment_secret(cls, v: str, info) -> str:
+        env = info.data.get("ENVIRONMENT", "development")
+        revoked_secrets = {
+            "servicepulse-agent-enrollment-secret-2026",
+            "replace-with-a-strong-random-enrollment-secret-at-least-32-chars",
+            "insecure-default",
+        }
+        if v in revoked_secrets:
+            raise ValueError(
+                "The configured AGENT_ENROLLMENT_SECRET has been revoked or is an insecure default. "
+                "Provide a strong, unique secret via environment (.env)."
+            )
+        if env == "production" and (not v or len(v) < 32):
+            raise ValueError("In production mode, AGENT_ENROLLMENT_SECRET must be at least 32 characters long.")
         return v
 
     # Database

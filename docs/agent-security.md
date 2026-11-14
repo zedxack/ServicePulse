@@ -32,7 +32,7 @@ The ServicePulse Agent is engineered according to five core security tenets:
 
 ---
 
-## 3. Windows DPAPI Credential Storage
+## 3. Windows DPAPI Credential Storage & Security Boundary
 
 Sensitive credentials generated during enrollment:
 
@@ -45,7 +45,7 @@ Sensitive credentials generated during enrollment:
 }
 ```
 
-Are encrypted via `win32crypt.CryptProtectData`:
+Are encrypted via `win32crypt.CryptProtectData` using machine scope (`0x5` = `0x1 | 0x4`):
 
 ```python
 encrypted = win32crypt.CryptProtectData(
@@ -54,14 +54,43 @@ encrypted = win32crypt.CryptProtectData(
     None,  # Optional entropy
     None,  # Reserved
     None,  # Prompt struct
-    0x1    # CRYPTPROTECT_UI_FORBIDDEN
+    0x5    # CRYPTPROTECT_UI_FORBIDDEN (0x1) | CRYPTPROTECT_LOCAL_MACHINE (0x4)
 )
 ```
 
-### Properties of DPAPI Protection:
-- **Decryption Restriction:** Only the local Windows machine context and security principal that performed the encryption can decrypt the payload.
-- **Zero Key Management:** Encryption keys are derived transparently from the Windows user/machine master key hierarchy.
-- **File System Permissions:** The output file `credentials.dat` is created with restricted ACLs allowing access exclusively to SYSTEM and the executing user account.
+### 3.1 DPAPI Scope Comparison: Machine-Scope vs. User-Scope
+
+| Dimension | User-Scope DPAPI (`0x1`) | Machine-Scope DPAPI (`0x5`) |
+|---|---|---|
+| **Key Derivation** | MasterKey derived from specific user password/SID in `%APPDATA%\Microsoft\Protect\{SID}` | Machine LSA key in `%SystemRoot%\System32\Microsoft\Protect\{Machine-GUID}` |
+| **Decryption Boundary** | Only processes running in that specific user session | Any process running on the local endpoint (SYSTEM, Admins, Services) |
+| **Service Decryption** | **Fails** when background Windows Service runs under `NT AUTHORITY\SYSTEM` | **Succeeds**: Background Windows Service and Administrator can both decrypt |
+| **Offline Defense** | Protected if disk or VM image is extracted | Protected if disk or VM image is extracted |
+| **Local User Defense** | Cryptographically bound to the user profile | **Requires NTFS ACL enforcement** to prevent standard users from reading file |
+
+### 3.2 Operating System Access Control (NTFS DACL)
+Because machine-scoped DPAPI allows any local process with file read permissions to decrypt, the primary security boundary against non-administrative local users is enforced by Windows NTFS Access Control Lists (DACLs):
+
+```powershell
+icacls.exe credentials.tmp /inheritance:r /grant:r "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" "%USERNAME%:(F)"
+```
+- `*S-1-5-18`: `NT AUTHORITY\SYSTEM` (Full Control)
+- `*S-1-5-32-544`: `BUILTIN\Administrators` (Full Control)
+- `%USERNAME%`: The enrolling administrative user (Full Control)
+- `/inheritance:r`: Strips all inherited permissions, explicitly denying `BUILTIN\Users` (`*S-1-5-32-545`) and `Everyone`.
+- Standard, non-elevated user accounts receive `Access is Denied` at the OS filesystem level.
+
+### 3.3 Windows Service Privileges & Least Privilege Analysis
+- **Service Identity:** The background service runs under `NT AUTHORITY\LocalSystem`.
+- **Why System Privileges are Required:**
+  1. **Service Control Manager (SCM):** Stopping/starting allowlisted OS services (`wuauserv`, `spooler`, `bits`, `w32time`) requires `SERVICE_START` and `SERVICE_STOP` rights in the service's DACL, restricted by Windows to `SYSTEM` and `Administrators`.
+  2. **Defender & Licensing Diagnostics:** Querying `Get-MpComputerStatus` and CIM `SoftwareLicensingProduct` requires administrative integrity; unprivileged accounts are denied.
+  3. **Enterprise Package Deployment:** System-wide software installations write to `C:\Program Files` and `HKLM\Software`, requiring administrative access.
+- **Application-Layer Least Privilege Guardrails:**
+  - Local strict action allowlist (`ALLOWED_ACTIONS`) and service allowlist (`ALLOWED_SERVICES`).
+  - Prohibited core OS services (`lsass`, `csrss`, `smss`, `wininit`, etc.) cannot be targeted.
+  - Complete prohibition of `shell=True` and shell metacharacters.
+  - Cryptographic SHA-256 and Authenticode digital signature verification.
 
 ---
 

@@ -4,7 +4,9 @@ Verifies the complete operational loop against the live running Docker backend:
 Agent -> Backend API -> PostgreSQL -> AgentCommand -> Execution -> Audit Log.
 Author: Muhammadyusuf Usmonov (AT-Servis BMI)
 """
+import os
 import uuid
+from pathlib import Path
 
 import httpx
 import pytest
@@ -15,7 +17,19 @@ from servicepulse.config import AgentConfig
 from servicepulse.telemetry import TelemetryAggregator
 
 BACKEND_URL = "http://localhost:8000"
-ENROLLMENT_SECRET = "servicepulse-agent-enrollment-secret-2026"
+
+
+def _get_enrollment_secret() -> str:
+    s = os.environ.get("AGENT_ENROLLMENT_SECRET")
+    if not s and Path(".env").is_file():
+        for line in Path(".env").read_text(encoding="utf-8").splitlines():
+            if line.startswith("AGENT_ENROLLMENT_SECRET="):
+                s = line.split("=", 1)[1].strip().strip('"').strip("'")
+                break
+    return s or "mock-unit-test-enrollment-secret-42"
+
+
+ENROLLMENT_SECRET = _get_enrollment_secret()
 ADMIN_EMAIL = "admin@servicepulse.uz"
 ADMIN_PASSWORD = "AdminPass2026!"
 

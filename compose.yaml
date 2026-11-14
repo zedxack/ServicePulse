@@ -38,7 +38,7 @@ services:
       DEBUG: "true"
       SECRET_KEY: ${SECRET_KEY:-insecure-default-change-in-production-servicepulse-security-token-key}
       BACKEND_CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:80"
-      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:-servicepulse-agent-enrollment-secret-2026}
+      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?AGENT_ENROLLMENT_SECRET must be configured in .env}
     ports:
       - "8000:8000"
     depends_on:

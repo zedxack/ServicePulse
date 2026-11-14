@@ -15,7 +15,7 @@ python servicepulse_agent.py --console --server-url "http://localhost:8000"
 
 ### 2. Enroll Agent with Backend
 ```powershell
-python servicepulse_agent.py --enroll --secret "servicepulse-agent-enrollment-secret-2026" --server-url "http://localhost:8000"
+python servicepulse_agent.py --enroll --secret "<STRONG_ENROLLMENT_SECRET_FROM_ENV>" --server-url "http://localhost:8000"
 ```
 
 ### 3. Check Status

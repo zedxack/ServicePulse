@@ -107,7 +107,7 @@ Get-Content -Path "C:\ProgramData\ServicePulse\logs\servicepulse_agent.log" -Wai
 
 ### Issue 1: "Invalid agent enrollment secret"
 - **Cause:** The `--secret` supplied does not match `AGENT_ENROLLMENT_SECRET` on the server.
-- **Solution:** Verify the enrollment secret with the ServicePulse platform administrator. In development, the default secret is `servicepulse-agent-enrollment-secret-2026`.
+- **Solution:** Verify the enrollment secret with the ServicePulse platform administrator. The enrollment secret must match the server-side environment variable `AGENT_ENROLLMENT_SECRET` configured in the backend `.env`.
 
 ### Issue 2: Agent reports "Server unreachable (offline mode active)"
 - **Cause:** Network connectivity interrupted, backend server down, or firewall blocking egress.

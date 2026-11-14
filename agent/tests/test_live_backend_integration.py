@@ -4,6 +4,7 @@ Tests live end-to-end integration against running Docker PostgreSQL backend.
 Author: Muhammadyusuf Usmonov (AT-Servis BMI)
 """
 import datetime
+import os
 import tempfile
 import time
 from pathlib import Path
@@ -55,8 +56,16 @@ async def test_live_docker_backend_telemetry_and_queue_flow():
     enrolled_agent_id = None
 
     try:
-        # 1. Real Enrollment
-        enroll_secret = "servicepulse-agent-enrollment-secret-2026"
+        # 1. Real Enrollment with environment-provided secret
+        enroll_secret = os.environ.get("AGENT_ENROLLMENT_SECRET")
+        if not enroll_secret and Path(".env").is_file():
+            for env_line in Path(".env").read_text(encoding="utf-8").splitlines():
+                if env_line.startswith("AGENT_ENROLLMENT_SECRET="):
+                    enroll_secret = env_line.split("=", 1)[1].strip().strip('"').strip("'")
+                    break
+        if not enroll_secret:
+            pytest.skip("AGENT_ENROLLMENT_SECRET not configured in environment or .env")
+
         creds = api_client.enroll(
             enrollment_secret=enroll_secret,
             hostname="AUDIT-WORKSTATION-WIN11",

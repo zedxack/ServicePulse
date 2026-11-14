@@ -6,10 +6,15 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from backend.app.core.config import settings
 from backend.app.db.base import Base
 from backend.app.db.init_db import init_db
 from backend.app.db.session import get_db
 from backend.app.main import app
+
+# Ensure isolated enrollment secret exists for test suite if unset
+if not settings.AGENT_ENROLLMENT_SECRET:
+    settings.AGENT_ENROLLMENT_SECRET = "test-isolated-agent-enrollment-secret-32ch!"
 
 # In-memory test SQLite async database
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

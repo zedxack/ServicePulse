@@ -49,7 +49,7 @@ Open an elevated PowerShell prompt and enroll the agent against the ServicePulse
 
 ```powershell
 .\ServicePulseAgent.exe --enroll `
-  --secret "servicepulse-agent-enrollment-secret-2026" `
+  --secret "<STRONG_ENROLLMENT_SECRET_FROM_ENV>" `
   --server-url "http://servicepulse.example.com:8000"
 ```
 
