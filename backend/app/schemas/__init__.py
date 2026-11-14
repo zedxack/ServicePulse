@@ -50,6 +50,14 @@ from backend.app.schemas.inventory import (
     RoomRead,
     RoomUpdate,
 )
+from backend.app.schemas.invitation import (
+    InvitationCreate,
+    InvitationCreateResponse,
+    InvitationRead,
+    InvitationValidateRequest,
+    InvitationValidateResponse,
+    JoinOrganizationRequest,
+)
 from backend.app.schemas.monitoring import (
     DeviceMonitoringConfigRead,
     DeviceMonitoringConfigUpdate,
@@ -66,6 +74,11 @@ from backend.app.schemas.organization import (
     OrganizationCreate,
     OrganizationRead,
     OrganizationUpdate,
+)
+from backend.app.schemas.organization_request import (
+    OrganizationRequestCreate,
+    OrganizationRequestRead,
+    OrganizationRequestReject,
 )
 from backend.app.schemas.remediation import (
     NotifyAdminParams,
@@ -182,6 +195,15 @@ __all__ = [
     "SoftwareRequestCreate",
     "SoftwareRequestReview",
     "SoftwareRequestRead",
+    "InvitationCreate",
+    "InvitationCreateResponse",
+    "InvitationRead",
+    "InvitationValidateRequest",
+    "InvitationValidateResponse",
+    "JoinOrganizationRequest",
+    "OrganizationRequestCreate",
+    "OrganizationRequestRead",
+    "OrganizationRequestReject",
     "PlatformDashboardResponse",
     "CompanyDashboardResponse",
     "SysAdminDashboardResponse",

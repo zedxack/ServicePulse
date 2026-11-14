@@ -26,6 +26,7 @@ describe('LoginPage Component & Production Security', () => {
       isLoading: false,
       isAuthenticated: false,
       login: vi.fn(),
+      joinOrganization: vi.fn(),
       logout: vi.fn(),
       hasRole: vi.fn().mockReturnValue(false),
       hasAnyRole: vi.fn().mockReturnValue(false),
@@ -39,7 +40,7 @@ describe('LoginPage Component & Production Security', () => {
 
     expect(screen.getByPlaceholderText('nom@servicepulse.uz')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••••••')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Kirish|Sign In/i })).toBeInTheDocument();
+    expect(screen.getByTestId('login-submit-btn')).toBeInTheDocument();
   });
 
   it('does NOT render demo account selectors when import.meta.env.DEV is false', () => {
@@ -54,6 +55,7 @@ describe('LoginPage Component & Production Security', () => {
         isLoading: false,
         isAuthenticated: false,
         login: vi.fn(),
+        joinOrganization: vi.fn(),
         logout: vi.fn(),
         hasRole: vi.fn().mockReturnValue(false),
         hasAnyRole: vi.fn().mockReturnValue(false),
@@ -89,6 +91,7 @@ describe('LoginPage Component & Production Security', () => {
       isLoading: false,
       isAuthenticated: false,
       login: mockLogin,
+      joinOrganization: vi.fn(),
       logout: vi.fn(),
       hasRole: vi.fn().mockReturnValue(true),
       hasAnyRole: vi.fn().mockReturnValue(true),
@@ -107,7 +110,7 @@ describe('LoginPage Component & Production Security', () => {
       target: { value: 'SecretPassword123!' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Kirish|Sign In/i }));
+    fireEvent.click(screen.getByTestId('login-submit-btn'));
 
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith({
@@ -132,6 +135,7 @@ describe('LoginPage Component & Production Security', () => {
       isLoading: false,
       isAuthenticated: false,
       login: mockLogin,
+      joinOrganization: vi.fn(),
       logout: vi.fn(),
       hasRole: vi.fn().mockReturnValue(false),
       hasAnyRole: vi.fn().mockReturnValue(false),
@@ -150,7 +154,7 @@ describe('LoginPage Component & Production Security', () => {
       target: { value: 'WrongPass!' },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Kirish|Sign In/i }));
+    fireEvent.click(screen.getByTestId('login-submit-btn'));
 
     await waitFor(() => {
       expect(screen.getByText('Incorrect email or password')).toBeInTheDocument();

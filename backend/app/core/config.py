@@ -4,7 +4,7 @@ Author: Muhammadyusuf Usmonov
 Academic Purpose: AT-Servis BMI
 """
 import json
-from typing import List, Union
+from typing import List, Optional, Union
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,6 +46,20 @@ class Settings(BaseSettings):
     FIRST_SUPPORT_PASSWORD: str = "SupportPass2026!"
     FIRST_EMPLOYEE_EMAIL: str = "employee@servicepulse.uz"
     FIRST_EMPLOYEE_PASSWORD: str = "EmployeePass2026!"
+
+    # Email Service Configuration
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_TLS: bool = True
+    EMAILS_FROM_EMAIL: str = "noreply@servicepulse.uz"
+    EMAILS_FROM_NAME: str = "ServicePulse Platform"
+    EMAIL_VERIFICATION_REQUIRED: bool = False
+
+    # Rate Limiting
+    RATE_LIMIT_AUTH_PER_MINUTE: int = 15
+    RATE_LIMIT_REGISTRATION_PER_MINUTE: int = 5
 
     @field_validator("SECRET_KEY")
     @classmethod

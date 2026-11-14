@@ -2,11 +2,13 @@
 ServicePulse - Pytest Test Fixtures & Test Client Configuration
 Author: Muhammadyusuf Usmonov
 """
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from backend.app.core.config import settings
+from backend.app.core.rate_limiter import auth_rate_limiter, registration_rate_limiter
 from backend.app.db.base import Base
 from backend.app.db.init_db import init_db
 from backend.app.db.session import get_db
@@ -15,6 +17,18 @@ from backend.app.main import app
 # Ensure isolated enrollment secret exists for test suite if unset
 if not settings.AGENT_ENROLLMENT_SECRET:
     settings.AGENT_ENROLLMENT_SECRET = "test-isolated-agent-enrollment-secret-32ch!"
+
+
+@pytest.fixture(autouse=True)
+def configure_test_rate_limiters():
+    """Ensure automated test executions are not blocked by in-memory rate limits."""
+    auth_rate_limiter.requests_per_minute = 10000
+    registration_rate_limiter.requests_per_minute = 10000
+    auth_rate_limiter._records.clear()
+    registration_rate_limiter._records.clear()
+    yield
+    auth_rate_limiter._records.clear()
+    registration_rate_limiter._records.clear()
 
 # In-memory test SQLite async database
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"

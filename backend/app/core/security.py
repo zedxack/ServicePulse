@@ -42,6 +42,28 @@ def needs_rehash(hashed_password: str) -> bool:
     return ph.check_needs_rehash(hashed_password)
 
 
+def validate_password_strength(password: str) -> tuple[bool, Optional[str]]:
+    """
+    Validate that password satisfies enterprise security policy:
+    - At least 8 characters long
+    - At least one uppercase character
+    - At least one lowercase character
+    - At least one digit
+    - At least one special symbol
+    """
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long."
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter."
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter."
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one number."
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>\-_=+[\]\\/`~]", password):
+        return False, "Password must contain at least one special character."
+    return True, None
+
+
 def create_access_token(
     subject: str,
     claims: Optional[Dict[str, Any]] = None,

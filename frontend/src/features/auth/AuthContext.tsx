@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authApi } from '../../shared/api/auth';
 import { clearAuthToken, setAuthToken } from '../../shared/api/client';
-import { LoginCredentials, User } from '../../shared/types/auth';
+import { JoinOrganizationRequest, LoginCredentials, User } from '../../shared/types/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<User>;
+  joinOrganization?: (data: JoinOrganizationRequest) => Promise<User>;
   logout: () => Promise<void>;
   hasRole: (role: string) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
@@ -53,6 +54,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const joinOrganization = async (data: JoinOrganizationRequest): Promise<User> => {
+    setIsLoading(true);
+    try {
+      const tokenResp = await authApi.joinOrganization(data);
+      setAuthToken(tokenResp.access_token);
+      setToken(tokenResp.access_token);
+
+      const profile = await authApi.getMe();
+      setUser(profile);
+      return profile;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await authApi.logout();
@@ -86,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         isAuthenticated: !!token && !!user,
         login,
+        joinOrganization,
         logout,
         hasRole,
         hasAnyRole,
