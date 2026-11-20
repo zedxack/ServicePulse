@@ -1,0 +1,70 @@
+# ==============================================================================
+# ServicePulse - Production Caddyfile Reverse Proxy & Automated HTTPS
+# Project: ServicePulse — Enterprise Hybrid RMM & ITSM Platform
+# Author: Muhammadyusuf Usmonov
+# Target Domain: https://servicepulse.uz
+# ==============================================================================
+
+{$DOMAIN_NAME:servicepulse.uz} {
+    # Automated TLS with Let's Encrypt / ZeroSSL
+    tls {$ACME_EMAIL:admin@servicepulse.uz}
+
+    # High-performance HTTP/2 & HTTP/3 compression
+    encode gzip zstd
+
+    # Security Headers (Defense-in-Depth)
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self';"
+        -Server
+    }
+
+    # API Endpoints and WebSocket Connections
+    # Caddy natively manages WebSocket upgrades (HTTP/1.1 101 Switching Protocols)
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Health Probe for Load Balancers and External Monitors
+    handle /health {
+        reverse_proxy backend:8000
+    }
+
+    # Interactive API Documentation
+    handle /docs* {
+        reverse_proxy backend:8000
+    }
+    handle /redoc* {
+        reverse_proxy backend:8000
+    }
+
+    # Frontend Single Page Application (Static Assets & Client Routing)
+    handle {
+        reverse_proxy frontend:80 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Access Logging with Automated File Rotation
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 20mb
+            roll_keep 5
+            roll_keep_for 720h
+        }
+        format json
+    }
+}

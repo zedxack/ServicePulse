@@ -1,0 +1,115 @@
+# ==============================================================================
+# ServicePulse - Local Development Docker Compose Specification
+# Project: ServicePulse — Enterprise Hybrid RMM & ITSM Platform
+# Author: Muhammadyusuf Usmonov
+# ==============================================================================
+name: servicepulse
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: servicepulse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-servicepulse}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_password_2026}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-servicepulse}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - servicepulse-net
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: servicepulse-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password_2026}@db:5432/${POSTGRES_DB:-servicepulse}
+      ENVIRONMENT: development
+      DEBUG: "true"
+      SECRET_KEY: ${SECRET_KEY:-insecure-default-change-in-production-servicepulse-security-token-key}
+      BACKEND_CORS_ORIGINS: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://localhost:80"
+      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?AGENT_ENROLLMENT_SECRET must be configured in .env}
+      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL:-muhammadyusufusmonov011@gmail.com}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-ChangeMeAdmin2026!}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic -c backend/alembic.ini upgrade head &&
+             python -m backend.app.db.init_db &&
+             uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - ./backend:/app/backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - servicepulse-net
+
+  network-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: servicepulse-network-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_password_2026}@db:5432/${POSTGRES_DB:-servicepulse}
+      ENVIRONMENT: development
+      DEBUG: "true"
+      SECRET_KEY: ${SECRET_KEY:-insecure-default-change-in-production-servicepulse-security-token-key}
+      AGENT_ENROLLMENT_SECRET: ${AGENT_ENROLLMENT_SECRET:?AGENT_ENROLLMENT_SECRET must be configured in .env}
+      FIRST_SUPERUSER_EMAIL: ${FIRST_SUPERUSER_EMAIL:-muhammadyusufusmonov011@gmail.com}
+      FIRST_SUPERUSER_PASSWORD: ${FIRST_SUPERUSER_PASSWORD:-ChangeMeAdmin2026!}
+      MONITORING_INTERVAL_SECONDS: "30"
+      MONITORING_CONCURRENCY_LIMIT: "10"
+      CONSECUTIVE_FAILURE_THRESHOLD: "3"
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: python -m backend.app.workers.network_worker
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'backend.app.workers.network_worker' 2>/dev/null || python -c \"import os, glob, sys; my_pid = str(os.getpid()); sys.exit(0 if any(b'backend.app.workers.network_worker' in open(p, 'rb').read() for p in glob.glob('/proc/[0-9]*/cmdline') if p.split('/')[2] != my_pid) else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./backend:/app/backend
+    networks:
+      - servicepulse-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: servicepulse-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - servicepulse-net
+
+volumes:
+  pgdata:
+    name: servicepulse-pgdata
+
+networks:
+  servicepulse-net:
+    name: servicepulse-net

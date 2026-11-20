@@ -1,0 +1,27 @@
+@import './design-tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: var(--sp-font-sans);
+    background-color: var(--sp-bg-canvas);
+    color: var(--sp-text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--sp-bg-canvas);
+    color: var(--sp-text-primary);
+    min-height: 100vh;
+  }
+
+  kbd, code, pre {
+    font-family: var(--sp-font-mono);
+    font-feature-settings: 'tnum' 1, 'zero' 1;
+    font-variant-numeric: tabular-nums;
+  }
+}
